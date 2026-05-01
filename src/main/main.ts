@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import * as path from 'node:path';
 import { GitCliRepository } from '../infrastructure/git/GitCliRepository';
 import type { WebviewToExtensionMessage } from '../shared/protocol';
@@ -7,8 +7,45 @@ import { DesktopLogger } from './logger';
 
 let mainWindow: BrowserWindow | undefined;
 let controller: DesktopMessageController | undefined;
+const WINDOWS_APP_ID = 'com.farigab.repoflow';
 
-function createApplicationMenu(activeController: DesktopMessageController): void {
+function resolveWindowIconPath(): string {
+  return path.join(__dirname, '../renderer/icon.png');
+}
+
+function resolveWindowsAppId(): string {
+  return app.isPackaged ? WINDOWS_APP_ID : process.execPath;
+}
+
+function applyWindowsTaskbarDetails(window: BrowserWindow): void {
+  if (process.platform !== 'win32') {
+    return;
+  }
+
+  const appId = resolveWindowsAppId();
+  app.setAppUserModelId(appId);
+  window.setAppDetails({
+    appId,
+    appIconPath: process.execPath,
+    appIconIndex: 0
+  });
+}
+
+async function showAboutDialog(ownerWindow: BrowserWindow): Promise<void> {
+  await dialog.showMessageBox(ownerWindow, {
+    type: 'info',
+    title: 'About RepoFlow',
+    message: 'RepoFlow',
+    detail: `Version ${app.getVersion()}\nStandalone desktop app for browsing Git repositories.`,
+    buttons: ['OK'],
+    noLink: true
+  });
+}
+
+function createApplicationMenu(
+  activeController: DesktopMessageController,
+  ownerWindow: BrowserWindow
+): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: 'File',
@@ -18,13 +55,6 @@ function createApplicationMenu(activeController: DesktopMessageController): void
           accelerator: 'CmdOrCtrl+O',
           click: () => {
             void activeController.openRepository();
-          }
-        },
-        {
-          label: 'Open Multiple Repositories...',
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: () => {
-            void activeController.openRepositories();
           }
         },
         { type: 'separator' },
@@ -43,7 +73,13 @@ function createApplicationMenu(activeController: DesktopMessageController): void
       label: 'View',
       submenu: [
         { role: 'reload' },
-        { role: 'toggleDevTools' }
+        { type: 'separator' },
+        {
+          label: 'About RepoFlow',
+          click: () => {
+            void showAboutDialog(ownerWindow);
+          }
+        }
       ]
     }
   ];
@@ -81,6 +117,7 @@ async function createMainWindow(): Promise<void> {
     minWidth: 960,
     minHeight: 640,
     title: 'RepoFlow',
+    icon: resolveWindowIconPath(),
     backgroundColor: '#1e1e1e',
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.cjs'),
@@ -90,8 +127,10 @@ async function createMainWindow(): Promise<void> {
     }
   });
 
+  applyWindowsTaskbarDetails(mainWindow);
+
   controller = new DesktopMessageController(mainWindow, repository, logger);
-  createApplicationMenu(controller);
+  createApplicationMenu(controller, mainWindow);
 
   ipcMain.removeAllListeners('repoflow:message');
   ipcMain.on('repoflow:message', (_event, message: WebviewToExtensionMessage) => {

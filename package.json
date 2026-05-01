@@ -6,12 +6,12 @@
   "description": "Standalone Windows desktop app for RepoFlow.",
   "main": "dist/main/main.cjs",
   "scripts": {
-    "build:icon": "node ./scripts/generate-ico.mjs",
+    "brand:electron": "node ./scripts/brand-electron-binaries.mjs",
     "build": "node ./esbuild.mjs",
-    "start": "npm run build && electron .",
+    "start": "npm run brand:electron && npm run build && electron .",
     "watch": "node ./esbuild.mjs --watch",
-    "dist:win": "npm run build:icon && npm run build && electron-builder --win nsis",
-    "dist:portable": "npm run build:icon && npm run build && electron-builder --win portable"
+    "dist:win": "npm run brand:electron && npm run build && electron-builder --win nsis",
+    "dist:portable": "npm run brand:electron && npm run build && electron-builder --win portable"
   },
   "build": {
     "appId": "com.farigab.repoflow",

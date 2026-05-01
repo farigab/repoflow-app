@@ -52,6 +52,7 @@ const builds = [
 async function writeRendererShell() {
   await mkdir(rendererDist, { recursive: true });
   await copyFile(path.join(desktopRoot, 'media/hero.svg'), path.join(rendererDist, 'hero.svg'));
+  await copyFile(path.join(desktopRoot, 'media/icon.png'), path.join(rendererDist, 'icon.png'));
   await writeFile(
     path.join(rendererDist, 'index.html'),
     `<!DOCTYPE html>

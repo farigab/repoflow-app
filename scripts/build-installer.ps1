@@ -4,8 +4,8 @@ Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-Write-Host 'Generating Windows icon...'
-node .\scripts\generate-ico.mjs
+Write-Host 'Branding Electron binaries...'
+node .\scripts\brand-electron-binaries.mjs
 
 Write-Host 'Building app bundles...'
 node .\esbuild.mjs
