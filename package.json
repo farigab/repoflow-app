@@ -1,0 +1,44 @@
+{
+  "name": "repoflow-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone Windows desktop app for RepoFlow.",
+  "main": "dist/main/main.cjs",
+  "scripts": {
+    "build": "node ./esbuild.mjs",
+    "start": "npm run build && electron .",
+    "watch": "node ./esbuild.mjs --watch",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.farigab.repoflow",
+    "productName": "RepoFlow",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.45",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,71 @@
+import type { CommitDetail, DiffRequest, DiffViewPayload, GraphFilters, GraphSnapshot, StashEntry, WorkingTreeFile, WorktreeEntry } from '../core/models';
+
+export interface RepositoryTabDescriptor {
+  repoRoot: string;
+  name: string;
+}
+
+export type WebviewToExtensionMessage =
+  | { type: 'ready' }
+  | { type: 'openRepositoryPicker'; payload: { allowMultiple: boolean } }
+  | { type: 'switchRepositoryTab'; payload: { repoRoot: string } }
+  | { type: 'closeRepositoryTab'; payload: { repoRoot: string } }
+  | { type: 'loadMore'; payload: { repoRoot: string; limit: number } }
+  | { type: 'applyFilters'; payload: { repoRoot: string; filters: Partial<GraphFilters> } }
+  | { type: 'selectCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'clearSelectedCommit'; payload: { repoRoot: string } }
+  | { type: 'openDiff'; payload: DiffRequest }
+  | { type: 'createBranchPrompt'; payload: { repoRoot: string; fromRef?: string } }
+  | { type: 'deleteBranch'; payload: { repoRoot: string; branchName: string } }
+  | { type: 'checkoutCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'cherryPick'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'revertCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'dropCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'mergeCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'rebaseOnCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'resetToCommit'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'copyHash'; payload: { hash: string } }
+  | { type: 'copySubject'; payload: { subject: string } }
+  | { type: 'openInTerminal'; payload: { repoRoot: string; commitHash: string } }
+  | { type: 'stageFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
+  | { type: 'unstageFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
+  | { type: 'discardFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
+  | { type: 'commitChangesPrompt'; payload: { repoRoot: string } }
+  | { type: 'setGitUserName'; payload: { repoRoot: string; name: string } }
+  | { type: 'setGitUserEmail'; payload: { repoRoot: string; email: string } }
+  | { type: 'setRemoteUrl'; payload: { repoRoot: string; remoteName: string; url: string } }
+  | { type: 'openPullRequest'; payload: { repoRoot: string; sourceBranch: string; targetBranch: string; title: string; description: string } }
+  | { type: 'listStashes'; payload: { repoRoot: string } }
+  | { type: 'stashChanges'; payload: { repoRoot: string; message?: string; includeUntracked: boolean } }
+  | { type: 'applyStash'; payload: { repoRoot: string; ref: string } }
+  | { type: 'popStash'; payload: { repoRoot: string; ref: string } }
+  | { type: 'dropStash'; payload: { repoRoot: string; ref: string } }
+  | { type: 'listWorktrees'; payload: { repoRoot: string } }
+  | { type: 'addWorktree'; payload: { repoRoot: string; branch: string; createNew: boolean; worktreePath: string } }
+  | { type: 'addWorktreeAtCommit'; payload: { repoRoot: string; worktreePath: string; commitHash: string } }
+  | { type: 'removeWorktree'; payload: { repoRoot: string; path: string; force: boolean } }
+  | { type: 'openWorktreeInWindow'; payload: { path: string } }
+  | { type: 'revealWorktreeInOs'; payload: { path: string } }
+  | { type: 'copyWorktreePath'; payload: { path: string } }
+  | { type: 'lockWorktree'; payload: { repoRoot: string; path: string } }
+  | { type: 'unlockWorktree'; payload: { repoRoot: string; path: string } }
+  | { type: 'moveWorktree'; payload: { repoRoot: string; path: string; newPath: string } }
+  | { type: 'continueOperation'; payload: { repoRoot: string; state: string } }
+  | { type: 'skipOperation'; payload: { repoRoot: string } }
+  | { type: 'abortOperation'; payload: { repoRoot: string; state: string } }
+  | { type: 'pullRepo'; payload: { repoRoot: string } }
+  | { type: 'pushRepo'; payload: { repoRoot: string } }
+  | { type: 'fetchRepo'; payload: { repoRoot: string } }
+  | { type: 'openFile'; payload: { repoRoot: string; filePath: string } };
+
+export type ExtensionToWebviewMessage =
+  | { type: 'repositoryTabs'; payload: { entries: RepositoryTabDescriptor[]; activeRepoRoot?: string } }
+  | { type: 'graphSnapshot'; payload: GraphSnapshot }
+  | { type: 'commitDetail'; payload: { repoRoot: string; detail: CommitDetail } }
+  | { type: 'diffView'; payload: DiffViewPayload }
+  | { type: 'revealCommit'; payload: { commitHash: string } }
+  | { type: 'busy'; payload: { value: boolean; label?: string } }
+  | { type: 'notification'; payload: { kind: 'info' | 'error'; message: string } }
+  | { type: 'stashList'; payload: { repoRoot: string; entries: StashEntry[] } }
+  | { type: 'worktreeList'; payload: { repoRoot: string; entries: WorktreeEntry[] } }
+  | { type: 'worktreeError'; payload: { repoRoot: string; message: string; path?: string; canForce?: boolean } };
