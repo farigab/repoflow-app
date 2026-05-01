@@ -33,24 +33,6 @@ async function fileExists(filePath) {
   }
 }
 
-function runRcedit(targetPath) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(rceditPath, [targetPath, '--set-icon', iconPath], {
-      stdio: 'inherit'
-    });
-
-    child.once('error', rejectPromise);
-    child.once('exit', (code) => {
-      if (code === 0) {
-        resolvePromise();
-        return;
-      }
-
-      rejectPromise(new Error(`rcedit failed for ${targetPath} with exit code ${code ?? 'unknown'}`));
-    });
-  });
-}
-
 function buildRceditArgs(targetPath, options = {}) {
   const productName = options.productName || defaultProductName;
   const companyName = options.companyName || defaultCompanyName;
