@@ -2,29 +2,54 @@
   "name": "repoflow-desktop",
   "version": "0.1.0",
   "private": true,
+  "author": "Farigab",
   "description": "Standalone Windows desktop app for RepoFlow.",
   "main": "dist/main/main.cjs",
   "scripts": {
+    "build:icon": "node ./scripts/generate-ico.mjs",
     "build": "node ./esbuild.mjs",
     "start": "npm run build && electron .",
     "watch": "node ./esbuild.mjs --watch",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build:icon && npm run build && electron-builder --win nsis",
+    "dist:portable": "npm run build:icon && npm run build && electron-builder --win portable"
   },
   "build": {
     "appId": "com.farigab.repoflow",
     "productName": "RepoFlow",
+    "asar": true,
+    "npmRebuild": false,
     "files": [
       "dist/**/*",
       "package.json"
     ],
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "media"
     },
     "win": {
+      "icon": "media/icon.ico",
+      "signAndEditExecutable": false,
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RepoFlow",
+      "runAfterFinish": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     }
   },
   "dependencies": {

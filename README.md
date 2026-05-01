@@ -62,10 +62,22 @@ If `REPOFLOW_REPO` is not set, the app tries the current working directory and t
 npm run dist:win
 ```
 
+If you want a direct PowerShell entrypoint without relying on `npm`, use:
+
+```powershell
+.\scripts\build-installer.ps1
+```
+
 Output goes to:
 
 ```text
 apps/desktop/release/
+```
+
+The installer artifact is generated as:
+
+```text
+RepoFlow-Setup-<version>.exe
 ```
 
 ## Already Wired
