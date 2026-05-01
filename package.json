@@ -16,6 +16,7 @@
   "build": {
     "appId": "com.farigab.repoflow",
     "productName": "RepoFlow",
+    "afterPack": "./scripts/electron-builder-hooks.cjs",
     "asar": true,
     "npmRebuild": false,
     "files": [
