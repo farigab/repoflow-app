@@ -14,6 +14,7 @@ import type {
 } from '../core/models';
 import type { ExtensionToWebviewMessage, RepositoryTabDescriptor } from '../shared/protocol';
 import { CommitDetails } from './components/CommitDetails';
+import { BranchesModal } from './components/BranchesModal';
 import { CreatePRModal } from './components/CreatePRModal';
 import { DeleteBranchesModal } from './components/DeleteBranchesModal';
 import { DiffViewer } from './components/DiffViewer';
@@ -70,6 +71,7 @@ export function App() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prOpen, setPrOpen] = useState(false);
+  const [branchesOpen, setBranchesOpen] = useState(false);
   const [deleteBranchesOpen, setDeleteBranchesOpen] = useState(false);
   const [stashOpen, setStashOpen] = useState(false);
   const [stashes, setStashes] = useState<StashEntry[]>([]);
@@ -184,6 +186,7 @@ export function App() {
     setContextMenu(null);
     setSettingsOpen(false);
     setPrOpen(false);
+    setBranchesOpen(false);
     setDeleteBranchesOpen(false);
     setStashOpen(false);
     setStashes([]);
@@ -472,6 +475,7 @@ export function App() {
           onLoadMore={handleLoadMore}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenPR={() => setPrOpen(true)}
+          onOpenBranches={() => setBranchesOpen(true)}
           onOpenDeleteBranches={() => setDeleteBranchesOpen(true)}
           onOpenStashModal={handleOpenStashModal}
           onOpenWorktreeModal={handleOpenWorktreeModal}
@@ -577,6 +581,12 @@ export function App() {
         <CreatePRModal
           snapshot={activeSnapshot}
           onClose={() => setPrOpen(false)}
+        />
+      ) : null}
+      {branchesOpen && activeSnapshot ? (
+        <BranchesModal
+          snapshot={activeSnapshot}
+          onClose={() => setBranchesOpen(false)}
         />
       ) : null}
       {deleteBranchesOpen && activeSnapshot ? (

@@ -63,7 +63,11 @@ export class DesktopMessageController {
       clearSelectedCommit: async (p) => this.handleClearSelectedCommit(p),
       openDiff: async (p) => this.showDiff(p),
       createBranchPrompt: async () => this.handleFeatureNeedsModal('Create Branch'),
+      createBranch: async (p) => this.handleCreateBranch(p),
       deleteBranch: async (p) => this.handleDeleteBranch(p),
+      deleteRemoteBranch: async (p) => this.handleDeleteRemoteBranch(p),
+      checkoutBranch: async (p) => this.handleCheckoutBranch(p),
+      mergeBranch: async (p) => this.handleMergeBranch(p),
       checkoutCommit: async (p) => this.handleCheckoutCommit(p),
       cherryPick: async (p) => this.handleCherryPick(p),
       revertCommit: async (p) => this.handleRevertCommit(p),
@@ -280,9 +284,49 @@ export class DesktopMessageController {
     session.pendingRevealHash = undefined;
   }
 
+  private async handleCreateBranch(payload: PayloadFor<'createBranch'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Creating branch...', async () => {
+      await this.repository.createBranch(payload.repoRoot, payload.branchName, payload.fromRef);
+    });
+  }
+
   private async handleDeleteBranch(payload: PayloadFor<'deleteBranch'>): Promise<void> {
+    if (payload.confirm !== false && !await this.confirm(`Delete local branch ${payload.branchName}?`, 'Delete')) {
+      return;
+    }
+
     await this.executeRepositoryAction(payload.repoRoot, 'Deleting branch...', async () => {
       await this.repository.deleteBranch(payload.repoRoot, payload.branchName);
+    });
+  }
+
+  private async handleDeleteRemoteBranch(payload: PayloadFor<'deleteRemoteBranch'>): Promise<void> {
+    if (!await this.confirm(`Delete remote branch ${payload.remote}/${payload.branchName}?`, 'Delete')) {
+      return;
+    }
+
+    await this.executeRepositoryAction(payload.repoRoot, 'Deleting remote branch...', async () => {
+      await this.repository.deleteRemoteBranch(payload.repoRoot, payload.remote, payload.branchName);
+    });
+  }
+
+  private async handleCheckoutBranch(payload: PayloadFor<'checkoutBranch'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Checking out branch...', async () => {
+      await this.repository.checkout(payload.repoRoot, payload.ref);
+    });
+  }
+
+  private async handleMergeBranch(payload: PayloadFor<'mergeBranch'>): Promise<void> {
+    const readableRef = payload.ref
+      .replace(/^refs\/heads\//, '')
+      .replace(/^refs\/remotes\//, '');
+
+    if (!await this.confirm(`Merge ${readableRef} into the current branch?`, 'Merge')) {
+      return;
+    }
+
+    await this.executeRepositoryAction(payload.repoRoot, 'Merging branch...', async () => {
+      await this.repository.merge(payload.repoRoot, payload.ref);
     });
   }
 

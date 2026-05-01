@@ -13,6 +13,7 @@ interface GraphCanvasProps {
     onLoadMore: (limit: number) => void;
     onOpenSettings: () => void;
     onOpenPR: () => void;
+    onOpenBranches: () => void;
     onOpenDeleteBranches: () => void;
     onOpenStashModal: () => void;
     onOpenWorktreeModal: () => void;
@@ -249,7 +250,7 @@ function highlightText(text: string, pattern: RegExp | null): ReactNode {
     return <>{parts}</>;
 }
 
-export function GraphCanvas({ snapshot, selectedCommitHash, selectedUncommitted, onSelectCommit, onSelectUncommitted, onOpenContextMenu, onLoadMore, onOpenSettings, onOpenPR, onOpenDeleteBranches, onOpenStashModal, onOpenWorktreeModal, onBannerAction, onOpenConflictFile }: GraphCanvasProps) {
+export function GraphCanvas({ snapshot, selectedCommitHash, selectedUncommitted, onSelectCommit, onSelectUncommitted, onOpenContextMenu, onLoadMore, onOpenSettings, onOpenPR, onOpenBranches, onOpenDeleteBranches, onOpenStashModal, onOpenWorktreeModal, onBannerAction, onOpenConflictFile }: GraphCanvasProps) {
     const rowHeight = 46;
     const laneGap = 20;
     const graphWidth = Math.max(110, 52 + (snapshot.maxLane + 1) * laneGap);
@@ -482,6 +483,15 @@ export function GraphCanvas({ snapshot, selectedCommitHash, selectedUncommitted,
                         aria-label="Git Stash"
                     >
                         <i className="codicon codicon-archive" aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        className="panel__settings-btn"
+                        onClick={onOpenBranches}
+                        title="Branches"
+                        aria-label="Branches"
+                    >
+                        <i className="codicon codicon-git-branch" aria-hidden="true" />
                     </button>
                     <button
                         type="button"

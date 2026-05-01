@@ -16,7 +16,11 @@ export type WebviewToExtensionMessage =
   | { type: 'clearSelectedCommit'; payload: { repoRoot: string } }
   | { type: 'openDiff'; payload: DiffRequest }
   | { type: 'createBranchPrompt'; payload: { repoRoot: string; fromRef?: string } }
-  | { type: 'deleteBranch'; payload: { repoRoot: string; branchName: string } }
+  | { type: 'createBranch'; payload: { repoRoot: string; branchName: string; fromRef?: string } }
+  | { type: 'deleteBranch'; payload: { repoRoot: string; branchName: string; confirm?: boolean } }
+  | { type: 'deleteRemoteBranch'; payload: { repoRoot: string; remote: string; branchName: string } }
+  | { type: 'checkoutBranch'; payload: { repoRoot: string; ref: string } }
+  | { type: 'mergeBranch'; payload: { repoRoot: string; ref: string } }
   | { type: 'checkoutCommit'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'cherryPick'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'revertCommit'; payload: { repoRoot: string; commitHash: string } }

@@ -50,7 +50,7 @@ export function DeleteBranchesModal({ snapshot, onClose }: DeleteBranchesModalPr
         for (const branchName of selectedBranches) {
             vscode.postMessage({
                 type: 'deleteBranch',
-                payload: { repoRoot: snapshot.repoRoot, branchName }
+                payload: { repoRoot: snapshot.repoRoot, branchName, confirm: false }
             });
         }
 
