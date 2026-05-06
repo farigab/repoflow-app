@@ -11,7 +11,9 @@
     "start": "npm run brand:electron && npm run build && electron .",
     "watch": "node ./esbuild.mjs --watch",
     "dist:win": "npm run brand:electron && npm run build && electron-builder --win nsis",
-    "dist:portable": "npm run brand:electron && npm run build && electron-builder --win portable"
+    "dist:portable": "npm run brand:electron && npm run build && electron-builder --win portable",
+    "dist:mac": "npm run build && electron-builder --mac dmg --arm64",
+    "dist:macx64": "npm run build && electron-builder --mac dmg --x64"
   },
   "build": {
     "appId": "com.farigab.repoflow",
@@ -40,7 +42,7 @@
       ]
     },
     "mac": {
-      "icon": "media/icon.icns",
+      "icon": "./media/icon-1254.png",
       "target": [
         {
           "target": "dmg",
