@@ -48,8 +48,8 @@ function setupMacOSCLI() {
     return;
   }
 
-  const scriptContent = '#!/bin/bash\\nopen -a "/Applications/RepoFlow.app" --args "$@"'
-  const command = `echo "${scriptContent}" > ${target} && chmod +x ${target}`;
+  const content = '#!/bin/bash\\n\\"/Applications/RepoFlow.app/Contents/MacOS/RepoFlow\\" \\"\\$@\\" > /dev/null 2>&1 &\\ndisown\\nexit'
+  const command = `echo "${content}" > ${target} && chmod +x ${target}`;
 
   exec(command, (error) => {
     if (error) {
