@@ -17,6 +17,16 @@ function resolveWindowsAppId(): string {
   return app.isPackaged ? WINDOWS_APP_ID : process.execPath;
 }
 
+function resolveCliPath(): string | undefined {
+  const userArgs = app.isPackaged? process.argv.slice(1) : process.argv.slice(2);
+  const pathArg = userArgs.find((arg) => !arg.startsWith('-'));
+  if (pathArg) {
+    return path.resolve(pathArg);
+  }
+
+  return undefined;
+}
+
 function applyWindowsTaskbarDetails(window: BrowserWindow): void {
   if (process.platform !== 'win32') {
     return;
@@ -146,6 +156,12 @@ async function createMainWindow(): Promise<void> {
 }
 
 app.whenReady().then(() => {
+  const cliPath = resolveCliPath();
+
+  if (cliPath) {
+    process.env.REPOFLOW_REPO = cliPath;
+  }
+
   void createMainWindow();
 
   app.on('activate', () => {
