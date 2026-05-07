@@ -500,9 +500,9 @@ export class GitCliRepository implements GitRepository {
 
   public async getRepoConfig(repoRoot: string): Promise<RepoGitConfig> {
     const [userName, userEmail, hooksPath, remoteRaw] = await Promise.all([
-      this.runGit(repoRoot, ['config', '--get', 'user.name']).catch(() => ''),
-      this.runGit(repoRoot, ['config', '--get', 'user.email']).catch(() => ''),
-      this.runGit(repoRoot, ['config', '--get', 'core.hooksPath']).catch(() => ''),
+      this.runGit(repoRoot, ['config', '--get', 'user.name'], { logErrors: false }).catch(() => ''),
+      this.runGit(repoRoot, ['config', '--get', 'user.email'], { logErrors: false }).catch(() => ''),
+      this.runGit(repoRoot, ['config', '--get', 'core.hooksPath'], { logErrors: false }).catch(() => ''),
       this.runGit(repoRoot, ['remote', '-v']).catch(() => '')
     ]);
     const hookScripts = await this.listHookScripts(repoRoot, hooksPath.trim());
