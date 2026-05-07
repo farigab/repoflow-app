@@ -275,10 +275,6 @@ export function App() {
     vscode.postMessage({ type: 'openRepositoryPicker', payload: { allowMultiple: false } });
   }, []);
 
-  const handleOpenMultipleRepositories = useCallback((): void => {
-    vscode.postMessage({ type: 'openRepositoryPicker', payload: { allowMultiple: true } });
-  }, []);
-
   const handleSwitchRepository = useCallback((repoRoot: string): void => {
     vscode.postMessage({ type: 'switchRepositoryTab', payload: { repoRoot } });
   }, []);
@@ -343,6 +339,16 @@ export function App() {
   const handleStageFile = useCallback((file: WorkingTreeFile): void => {
     if (!activeSnapshot) return;
     vscode.postMessage({ type: 'stageFile', payload: { repoRoot: activeSnapshot.repoRoot, file } });
+  }, [activeSnapshot]);
+
+  const handleStageAll = useCallback((): void => {
+    if (!activeSnapshot) return;
+    vscode.postMessage({ type: 'stageAll', payload: { repoRoot: activeSnapshot.repoRoot } });
+  }, [activeSnapshot]);
+
+  const handleUnstageAll = useCallback((): void => {
+    if (!activeSnapshot) return;
+    vscode.postMessage({ type: 'unstageAll', payload: { repoRoot: activeSnapshot.repoRoot } });
   }, [activeSnapshot]);
 
   const handleUnstageFile = useCallback((file: WorkingTreeFile): void => {
@@ -530,6 +536,8 @@ export function App() {
               ? <LocalChangesPanel
                 status={activeSnapshot.localChanges}
                 onStage={handleStageFile}
+                onStageAll={handleStageAll}
+                onUnstageAll={handleUnstageAll}
                 onUnstage={handleUnstageFile}
                 onDiscard={handleDiscardFile}
                 onCommit={handleCommit}
@@ -557,7 +565,6 @@ export function App() {
           onSelect={handleSwitchRepository}
           onClose={handleCloseRepository}
           onOpenSingle={handleOpenSingleRepository}
-          onOpenMultiple={handleOpenMultipleRepositories}
         />
       ) : null}
 

@@ -91,6 +91,8 @@ export class DesktopMessageController {
       copySubject: async (p) => this.handleCopySubject(p),
       openInTerminal: async (p) => this.handleOpenInTerminal(p),
       stageFile: async (p) => this.handleStageFile(p),
+      stageAll: async (p) => this.handleStageAll(p),
+      unstageAll: async (p) => this.handleUnstageAll(p),
       unstageFile: async (p) => this.handleUnstageFile(p),
       discardFile: async (p) => this.handleDiscardFile(p),
       commitChanges: async (p) => this.handleCommitChanges(p),
@@ -440,6 +442,18 @@ export class DesktopMessageController {
   private async handleStageFile(payload: PayloadFor<'stageFile'>): Promise<void> {
     await this.executeRepositoryAction(payload.repoRoot, 'Staging file...', async () => {
       await this.repository.stageFile(payload.repoRoot, payload.file.path);
+    });
+  }
+
+  private async handleStageAll(payload: PayloadFor<'stageAll'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Staging all changes...', async () => {
+      await this.repository.stageAll(payload.repoRoot);
+    });
+  }
+
+  private async handleUnstageAll(payload: PayloadFor<'unstageAll'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Unstaging all changes...', async () => {
+      await this.repository.unstageAll(payload.repoRoot);
     });
   }
 

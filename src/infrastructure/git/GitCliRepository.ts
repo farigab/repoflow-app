@@ -292,14 +292,33 @@ export class GitCliRepository implements GitRepository {
     this.graphCache.clear();
   }
 
+  public async stageAll(repoRoot: string): Promise<void> {
+    await this.runGit(repoRoot, ['add', '--all']);
+    this.graphCache.clear();
+  }
+
+  public async unstageAll(repoRoot: string): Promise<void> {
+    if (await this.hasHeadCommit(repoRoot)) {
+      await this.runGit(repoRoot, ['restore', '--staged', '--', '.']);
+    } else {
+      await this.runGit(repoRoot, ['rm', '-r', '--cached', '--', '.']);
+    }
+    this.graphCache.clear();
+  }
+
   public async unstageFile(repoRoot: string, targetPath: string): Promise<void> {
-    await this.runGit(repoRoot, ['restore', '--staged', '--', targetPath]);
+    if (await this.hasHeadCommit(repoRoot)) {
+      await this.runGit(repoRoot, ['restore', '--staged', '--', targetPath]);
+    } else {
+      await this.runGit(repoRoot, ['rm', '--cached', '--', targetPath]);
+    }
     this.graphCache.clear();
   }
 
   public async discardFile(repoRoot: string, targetPath: string, tracked: boolean): Promise<void> {
     if (tracked) {
-      await this.runGit(repoRoot, ['restore', '--source=HEAD', '--staged', '--worktree', '--', targetPath]);
+      const restoreSource = await this.hasHeadCommit(repoRoot) ? 'HEAD' : EMPTY_TREE;
+      await this.runGit(repoRoot, ['restore', `--source=${restoreSource}`, '--staged', '--worktree', '--', targetPath]);
     } else {
       await this.runGit(repoRoot, ['clean', '-fd', '--', targetPath]);
     }
@@ -315,6 +334,15 @@ export class GitCliRepository implements GitRepository {
     args.push('-m', message);
     await this.runGit(repoRoot, args);
     this.graphCache.clear();
+  }
+
+  private async hasHeadCommit(repoRoot: string): Promise<boolean> {
+    try {
+      await this.runGit(repoRoot, ['rev-parse', '--verify', 'HEAD']);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   public async createBranch(repoRoot: string, name: string, fromRef?: string): Promise<void> {

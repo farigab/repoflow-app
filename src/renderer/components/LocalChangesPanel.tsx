@@ -18,23 +18,27 @@ function splitPath(path: string): { dir: string; name: string } {
 }
 
 interface LocalChangesPanelProps {
-    status: WorkingTreeStatus;
-    onStage: (file: WorkingTreeFile) => void;
-    onUnstage: (file: WorkingTreeFile) => void;
-    onDiscard: (file: WorkingTreeFile) => void;
-    onCommit: () => void;
+    readonly status: WorkingTreeStatus;
+    readonly onStage: (file: WorkingTreeFile) => void;
+    readonly onStageAll: () => void;
+    readonly onUnstageAll: () => void;
+    readonly onUnstage: (file: WorkingTreeFile) => void;
+    readonly onDiscard: (file: WorkingTreeFile) => void;
+    readonly onCommit: () => void;
 }
 
 interface FileSectionProps {
-    title: string;
-    sectionType: 'staged' | 'unstaged' | 'conflicts';
-    files: WorkingTreeFile[];
-    onPrimaryAction: (file: WorkingTreeFile) => void;
-    primaryLabel: string;
-    onDiscard: (file: WorkingTreeFile) => void;
+    readonly title: string;
+    readonly sectionType: 'staged' | 'unstaged' | 'conflicts';
+    readonly files: WorkingTreeFile[];
+    readonly onPrimaryAction: (file: WorkingTreeFile) => void;
+    readonly primaryLabel: string;
+    readonly onDiscard: (file: WorkingTreeFile) => void;
+    readonly headerActionLabel?: string;
+    readonly onHeaderAction?: () => void;
 }
 
-function FileSection({ title, sectionType, files, onPrimaryAction, primaryLabel, onDiscard }: FileSectionProps) {
+function FileSection({ title, sectionType, files, onPrimaryAction, primaryLabel, onDiscard, headerActionLabel, onHeaderAction }: FileSectionProps) {
     if (files.length === 0) {
         return null;
     }
@@ -42,8 +46,15 @@ function FileSection({ title, sectionType, files, onPrimaryAction, primaryLabel,
     return (
         <section className={`changes__section changes__section--${sectionType}`}>
             <header className="changes__section-header">
-                <h3>{title}</h3>
-                <span className="changes__section-count">{files.length}</span>
+                <div className="changes__section-heading">
+                    <h3>{title}</h3>
+                    <span className="changes__section-count">{files.length}</span>
+                </div>
+                {headerActionLabel && onHeaderAction ? (
+                    <button type="button" className="changes__section-action button--ghost" onClick={onHeaderAction}>
+                        {headerActionLabel}
+                    </button>
+                ) : null}
             </header>
             <div className="changes__list">
                 {files.map((file) => {
@@ -74,7 +85,7 @@ function FileSection({ title, sectionType, files, onPrimaryAction, primaryLabel,
     );
 }
 
-export function LocalChangesPanel({ status, onStage, onUnstage, onDiscard, onCommit }: LocalChangesPanelProps) {
+export function LocalChangesPanel({ status, onStage, onStageAll, onUnstageAll, onUnstage, onDiscard, onCommit }: LocalChangesPanelProps) {
     const totalChanges = status.staged.length + status.unstaged.length + status.conflicted.length;
 
     return (
@@ -112,8 +123,26 @@ export function LocalChangesPanel({ status, onStage, onUnstage, onDiscard, onCom
             </div>
 
             <FileSection title="Conflicts" sectionType="conflicts" files={status.conflicted} onPrimaryAction={onStage} primaryLabel="Stage" onDiscard={onDiscard} />
-            <FileSection title="Staged" sectionType="staged" files={status.staged} onPrimaryAction={onUnstage} primaryLabel="Unstage" onDiscard={onDiscard} />
-            <FileSection title="Unstaged" sectionType="unstaged" files={status.unstaged} onPrimaryAction={onStage} primaryLabel="Stage" onDiscard={onDiscard} />
+            <FileSection
+                title="Staged"
+                sectionType="staged"
+                files={status.staged}
+                onPrimaryAction={onUnstage}
+                primaryLabel="Unstage"
+                onDiscard={onDiscard}
+                headerActionLabel="Unstage All"
+                onHeaderAction={onUnstageAll}
+            />
+            <FileSection
+                title="Unstaged"
+                sectionType="unstaged"
+                files={status.unstaged}
+                onPrimaryAction={onStage}
+                primaryLabel="Stage"
+                onDiscard={onDiscard}
+                headerActionLabel="Stage All"
+                onHeaderAction={onStageAll}
+            />
         </section>
     );
 }

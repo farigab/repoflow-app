@@ -1091,6 +1091,14 @@ mark.find-highlight {
   justify-content: space-between;
   align-items: center;
   padding: 0 0 0.5rem;
+  gap: 0.5rem;
+}
+
+.changes__section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
 .changes__section-header h3 {
@@ -1114,6 +1122,12 @@ mark.find-highlight {
   font-weight: 700;
   background: color-mix(in srgb, var(--muted) 18%, transparent 82%);
   color: var(--text);
+}
+
+.changes__section-action {
+  font-size: 0.76rem;
+  padding: 0.18rem 0.5rem;
+  white-space: nowrap;
 }
 
 .change-item {

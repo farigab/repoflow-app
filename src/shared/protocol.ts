@@ -30,6 +30,8 @@ export type WebviewToExtensionMessage =
   | { type: 'copySubject'; payload: { subject: string } }
   | { type: 'openInTerminal'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'stageFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
+  | { type: 'stageAll'; payload: { repoRoot: string } }
+  | { type: 'unstageAll'; payload: { repoRoot: string } }
   | { type: 'unstageFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
   | { type: 'discardFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
   | { type: 'commitChanges'; payload: { repoRoot: string; message: string; amend: boolean } }
