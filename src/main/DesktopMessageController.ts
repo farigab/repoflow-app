@@ -227,9 +227,7 @@ export class DesktopMessageController {
       return;
     }
 
-    if (!await this.openRepository()) {
-      await this.postRepositoryTabs();
-    }
+    await this.postRepositoryTabs();
   }
 
   private async handleOpenRepositoryPicker(payload: PayloadFor<'openRepositoryPicker'>): Promise<void> {

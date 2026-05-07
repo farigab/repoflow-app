@@ -8,13 +8,55 @@ const electronBinary = path.join(workspaceRoot, 'node_modules', '.bin', process.
 const packagedExecutable = path.join(workspaceRoot, 'release', 'win-unpacked', 'RepoFlow.exe');
 const forwardedArgs = process.argv.slice(2);
 
+function resolveRepositoryArgument(value, baseDirectory) {
+  return path.isAbsolute(value) ? value : path.resolve(baseDirectory, value);
+}
+
+function normalizeForwardedArgs(args, baseDirectory) {
+  const normalizedArgs = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (!arg) {
+      continue;
+    }
+
+    if (arg === '--') {
+      normalizedArgs.push(arg, ...args.slice(index + 1).map((entry) => resolveRepositoryArgument(entry, baseDirectory)));
+      break;
+    }
+
+    if (arg === '--repo' || arg === '-r') {
+      normalizedArgs.push(arg);
+      const nextArg = args[index + 1];
+      if (nextArg) {
+        normalizedArgs.push(resolveRepositoryArgument(nextArg, baseDirectory));
+        index += 1;
+      }
+      continue;
+    }
+
+    if (arg.startsWith('--repo=')) {
+      normalizedArgs.push(`--repo=${resolveRepositoryArgument(arg.slice('--repo='.length), baseDirectory)}`);
+      continue;
+    }
+
+    normalizedArgs.push(arg.startsWith('-') ? arg : resolveRepositoryArgument(arg, baseDirectory));
+  }
+
+  return normalizedArgs;
+}
+
+const normalizedForwardedArgs = normalizeForwardedArgs(forwardedArgs, process.cwd());
+
 const command = process.platform === 'win32' && require('node:fs').existsSync(packagedExecutable)
   ? packagedExecutable
   : electronBinary;
 
 const commandArgs = command === packagedExecutable
-  ? forwardedArgs
-  : ['.', ...forwardedArgs];
+  ? normalizedForwardedArgs
+  : ['.', ...normalizedForwardedArgs];
 
 const shouldDetach = process.platform === 'win32';
 
