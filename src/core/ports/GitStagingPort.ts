@@ -1,5 +1,7 @@
 export interface GitStagingPort {
   stageFile(repoRoot: string, path: string): Promise<void>;
+  stageAll(repoRoot: string): Promise<void>;
+  unstageAll(repoRoot: string): Promise<void>;
   unstageFile(repoRoot: string, path: string): Promise<void>;
   discardFile(repoRoot: string, path: string, tracked: boolean): Promise<void>;
   commit(repoRoot: string, message: string, amend?: boolean): Promise<void>;

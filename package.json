@@ -2,6 +2,9 @@
   "name": "repoflow-desktop",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "repoflow": "./bin/repoflow.cjs"
+  },
   "author": "Farigab",
   "description": "Standalone Windows desktop app for RepoFlow.",
   "main": "dist/main/main.cjs",

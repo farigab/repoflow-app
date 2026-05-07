@@ -2,6 +2,7 @@ import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CommitSummary, GraphSnapshot, WorkingTreeStatus } from '../../core/models';
 import { buildRepoSummary } from '../../shared/repoSummary';
+import { GraphToolbar } from './GraphToolbar';
 
 interface GraphCanvasProps {
     snapshot: GraphSnapshot;
@@ -17,6 +18,8 @@ interface GraphCanvasProps {
     onOpenDeleteBranches: () => void;
     onOpenStashModal: () => void;
     onOpenWorktreeModal: () => void;
+    onOpenBranchCompareModal: () => void;
+    onOpenUndoModal: () => void;
     onBannerAction: (action: 'continue' | 'skip' | 'abort' | 'pull' | 'push' | 'fetch') => void;
     onOpenConflictFile: (filePath: string) => void;
 }
@@ -250,7 +253,7 @@ function highlightText(text: string, pattern: RegExp | null): ReactNode {
     return <>{parts}</>;
 }
 
-export function GraphCanvas({ snapshot, selectedCommitHash, selectedUncommitted, onSelectCommit, onSelectUncommitted, onOpenContextMenu, onLoadMore, onOpenSettings, onOpenPR, onOpenBranches, onOpenDeleteBranches, onOpenStashModal, onOpenWorktreeModal, onBannerAction, onOpenConflictFile }: GraphCanvasProps) {
+export function GraphCanvas({ snapshot, selectedCommitHash, selectedUncommitted, onSelectCommit, onSelectUncommitted, onOpenContextMenu, onLoadMore, onOpenSettings, onOpenPR, onOpenBranches, onOpenDeleteBranches, onOpenStashModal, onOpenWorktreeModal, onOpenBranchCompareModal, onOpenUndoModal, onBannerAction, onOpenConflictFile }: GraphCanvasProps) {
     const rowHeight = 46;
     const laneGap = 20;
     const graphWidth = Math.max(110, 52 + (snapshot.maxLane + 1) * laneGap);
@@ -456,62 +459,16 @@ export function GraphCanvas({ snapshot, selectedCommitHash, selectedUncommitted,
                     <span className="panel__eyebrow">Commit Graph</span>
                     <h2>History</h2>
                 </div>
-                <div className="panel__header-actions">
-                    <button
-                        type="button"
-                        className="panel__settings-btn"
-                        onClick={onOpenPR}
-                        title="Create Pull Request"
-                        aria-label="Create Pull Request"
-                    >
-                        <i className="codicon codicon-git-pull-request-create" aria-hidden="true" />
-                    </button>
-                    <button
-                        type="button"
-                        className="panel__settings-btn"
-                        onClick={onOpenWorktreeModal}
-                        title="Worktree Manager"
-                        aria-label="Worktree Manager"
-                    >
-                        <i className="codicon codicon-repo-clone" aria-hidden="true" />
-                    </button>
-                    <button
-                        type="button"
-                        className="panel__settings-btn"
-                        onClick={onOpenStashModal}
-                        title="Git Stash"
-                        aria-label="Git Stash"
-                    >
-                        <i className="codicon codicon-archive" aria-hidden="true" />
-                    </button>
-                    <button
-                        type="button"
-                        className="panel__settings-btn"
-                        onClick={onOpenBranches}
-                        title="Branches"
-                        aria-label="Branches"
-                    >
-                        <i className="codicon codicon-git-branch" aria-hidden="true" />
-                    </button>
-                    <button
-                        type="button"
-                        className="panel__settings-btn"
-                        onClick={onOpenDeleteBranches}
-                        title="Delete Local Branches"
-                        aria-label="Delete Local Branches"
-                    >
-                        <i className="codicon codicon-trash" aria-hidden="true" />
-                    </button>
-                    <button
-                        type="button"
-                        className="panel__settings-btn"
-                        onClick={onOpenSettings}
-                        title="Repository Settings"
-                        aria-label="Repository Settings"
-                    >
-                        <i className="codicon codicon-settings-gear" aria-hidden="true" />
-                    </button>
-                </div>
+                <GraphToolbar
+                    onOpenPR={onOpenPR}
+                    onOpenWorktreeModal={onOpenWorktreeModal}
+                    onOpenStashModal={onOpenStashModal}
+                    onOpenBranches={onOpenBranches}
+                    onOpenBranchCompareModal={onOpenBranchCompareModal}
+                    onOpenUndoModal={onOpenUndoModal}
+                    onOpenDeleteBranches={onOpenDeleteBranches}
+                    onOpenSettings={onOpenSettings}
+                />
             </header>
 
             <RepoStatusBanner status={snapshot.localChanges} onAction={onBannerAction} onOpenConflictFile={onOpenConflictFile} />

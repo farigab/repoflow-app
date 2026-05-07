@@ -8,7 +8,6 @@ interface RepositoryTabsProps {
   onSelect: (repoRoot: string) => void;
   onClose: (repoRoot: string) => void;
   onOpenSingle: () => void;
-  onOpenMultiple: () => void;
 }
 
 function buildTabMeta(snapshot?: GraphSnapshot): { branch: string; changeCount: number; hasConflicts: boolean } {
@@ -33,20 +32,42 @@ function buildTabMeta(snapshot?: GraphSnapshot): { branch: string; changeCount: 
   };
 }
 
+function buildStatusClassName(meta: { changeCount: number; hasConflicts: boolean }): string {
+  if (meta.hasConflicts) {
+    return 'repo-tab__status repo-tab__status--warning';
+  }
+
+  if (meta.changeCount > 0) {
+    return 'repo-tab__status repo-tab__status--dirty';
+  }
+
+  return 'repo-tab__status';
+}
+
+function buildMetaLabel(meta: { branch: string; changeCount: number }): string {
+  if (meta.changeCount === 0) {
+    return meta.branch;
+  }
+
+  const suffix = meta.changeCount > 1 ? 's' : '';
+  return `${meta.branch} - ${meta.changeCount} change${suffix}`;
+}
+
 export function RepositoryTabs({
   entries,
   activeRepoRoot,
   snapshotsByRepo,
   onSelect,
   onClose,
-  onOpenSingle,
-  onOpenMultiple
-}: RepositoryTabsProps) {
+  onOpenSingle
+}: Readonly<RepositoryTabsProps>) {
   return (
     <header className="repo-tabs">
       <div className="repo-tabs__scroller" role="tablist" aria-label="Open repositories">
         {entries.map((entry) => {
           const meta = buildTabMeta(snapshotsByRepo[entry.repoRoot]);
+          const statusClassName = buildStatusClassName(meta);
+          const metaLabel = buildMetaLabel(meta);
           const isActive = entry.repoRoot === activeRepoRoot;
 
           return (
@@ -59,13 +80,10 @@ export function RepositoryTabs({
                 title={entry.repoRoot}
                 onClick={() => onSelect(entry.repoRoot)}
               >
-                <span className={`repo-tab__status${meta.hasConflicts ? ' repo-tab__status--warning' : meta.changeCount > 0 ? ' repo-tab__status--dirty' : ''}`} />
+                <span className={statusClassName} />
                 <span className="repo-tab__text">
                   <span className="repo-tab__title">{entry.name}</span>
-                  <span className="repo-tab__meta">
-                    {meta.branch}
-                    {meta.changeCount > 0 ? ` - ${meta.changeCount} change${meta.changeCount > 1 ? 's' : ''}` : ''}
-                  </span>
+                  <span className="repo-tab__meta">{metaLabel}</span>
                 </span>
               </button>
               <button
@@ -83,11 +101,8 @@ export function RepositoryTabs({
       </div>
 
       <div className="repo-tabs__actions">
-        <button type="button" className="repo-tabs__action" onClick={onOpenSingle} title="Open one repository">
+        <button type="button" className="repo-tabs__action" onClick={onOpenSingle} title="Open repository">
           <i className="codicon codicon-folder-opened" aria-hidden="true" /> Open repository
-        </button>
-        <button type="button" className="repo-tabs__action" onClick={onOpenMultiple} title="Open multiple repositories">
-          <i className="codicon codicon-files" aria-hidden="true" /> Open multiple
         </button>
       </div>
     </header>

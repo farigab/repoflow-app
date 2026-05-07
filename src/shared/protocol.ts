@@ -1,4 +1,4 @@
-import type { CommitDetail, DiffRequest, DiffViewPayload, GraphFilters, GraphSnapshot, StashEntry, WorkingTreeFile, WorktreeEntry } from '../core/models';
+import type { BranchCompareResult, CommitDetail, DiffRequest, DiffViewPayload, GraphFilters, GraphSnapshot, StashEntry, UndoEntry, WorkingTreeFile, WorktreeEntry } from '../core/models';
 
 export interface RepositoryTabDescriptor {
   repoRoot: string;
@@ -15,7 +15,6 @@ export type WebviewToExtensionMessage =
   | { type: 'selectCommit'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'clearSelectedCommit'; payload: { repoRoot: string } }
   | { type: 'openDiff'; payload: DiffRequest }
-  | { type: 'createBranchPrompt'; payload: { repoRoot: string; fromRef?: string } }
   | { type: 'createBranch'; payload: { repoRoot: string; branchName: string; fromRef?: string } }
   | { type: 'deleteBranch'; payload: { repoRoot: string; branchName: string; confirm?: boolean } }
   | { type: 'deleteRemoteBranch'; payload: { repoRoot: string; remote: string; branchName: string } }
@@ -27,22 +26,27 @@ export type WebviewToExtensionMessage =
   | { type: 'dropCommit'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'mergeCommit'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'rebaseOnCommit'; payload: { repoRoot: string; commitHash: string } }
-  | { type: 'resetToCommit'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'copyHash'; payload: { hash: string } }
   | { type: 'copySubject'; payload: { subject: string } }
   | { type: 'openInTerminal'; payload: { repoRoot: string; commitHash: string } }
   | { type: 'stageFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
+  | { type: 'stageAll'; payload: { repoRoot: string } }
+  | { type: 'unstageAll'; payload: { repoRoot: string } }
   | { type: 'unstageFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
   | { type: 'discardFile'; payload: { repoRoot: string; file: WorkingTreeFile } }
-  | { type: 'commitChangesPrompt'; payload: { repoRoot: string } }
+  | { type: 'commitChanges'; payload: { repoRoot: string; message: string; amend: boolean } }
   | { type: 'setGitUserName'; payload: { repoRoot: string; name: string } }
   | { type: 'setGitUserEmail'; payload: { repoRoot: string; email: string } }
+  | { type: 'setGitHooksPath'; payload: { repoRoot: string; hooksPath: string } }
+  | { type: 'openHooksFolder'; payload: { repoRoot: string; hooksPath: string } }
+  | { type: 'openHookScript'; payload: { repoRoot: string; hooksPath: string; hookName: string } }
   | { type: 'setRemoteUrl'; payload: { repoRoot: string; remoteName: string; url: string } }
   | { type: 'openPullRequest'; payload: { repoRoot: string; sourceBranch: string; targetBranch: string; title: string; description: string } }
   | { type: 'listStashes'; payload: { repoRoot: string } }
-  | { type: 'stashChanges'; payload: { repoRoot: string; message?: string; includeUntracked: boolean } }
-  | { type: 'applyStash'; payload: { repoRoot: string; ref: string } }
-  | { type: 'popStash'; payload: { repoRoot: string; ref: string } }
+  | { type: 'stashChanges'; payload: { repoRoot: string; message?: string; includeUntracked: boolean; paths?: string[] } }
+  | { type: 'previewStash'; payload: { repoRoot: string; ref: string } }
+  | { type: 'applyStash'; payload: { repoRoot: string; ref: string; paths?: string[] } }
+  | { type: 'popStash'; payload: { repoRoot: string; ref: string; paths?: string[] } }
   | { type: 'dropStash'; payload: { repoRoot: string; ref: string } }
   | { type: 'listWorktrees'; payload: { repoRoot: string } }
   | { type: 'addWorktree'; payload: { repoRoot: string; branch: string; createNew: boolean; worktreePath: string } }
@@ -60,7 +64,11 @@ export type WebviewToExtensionMessage =
   | { type: 'pullRepo'; payload: { repoRoot: string } }
   | { type: 'pushRepo'; payload: { repoRoot: string } }
   | { type: 'fetchRepo'; payload: { repoRoot: string } }
-  | { type: 'openFile'; payload: { repoRoot: string; filePath: string } };
+  | { type: 'openFile'; payload: { repoRoot: string; filePath: string } }
+  | { type: 'compareBranches'; payload: { repoRoot: string; baseRef: string; targetRef: string } }
+  | { type: 'listUndoEntries'; payload: { repoRoot: string } }
+  | { type: 'undoTo'; payload: { repoRoot: string; ref: string } }
+  | { type: 'resetToMode'; payload: { repoRoot: string; commitHash: string; mode: 'soft' | 'mixed' | 'hard' } };
 
 export type ExtensionToWebviewMessage =
   | { type: 'repositoryTabs'; payload: { entries: RepositoryTabDescriptor[]; activeRepoRoot?: string } }
@@ -72,4 +80,6 @@ export type ExtensionToWebviewMessage =
   | { type: 'notification'; payload: { kind: 'info' | 'error'; message: string } }
   | { type: 'stashList'; payload: { repoRoot: string; entries: StashEntry[] } }
   | { type: 'worktreeList'; payload: { repoRoot: string; entries: WorktreeEntry[] } }
-  | { type: 'worktreeError'; payload: { repoRoot: string; message: string; path?: string; canForce?: boolean } };
+  | { type: 'worktreeError'; payload: { repoRoot: string; message: string; path?: string; canForce?: boolean } }
+  | { type: 'branchCompareResult'; payload: BranchCompareResult }
+  | { type: 'undoEntries'; payload: { entries: UndoEntry[] } };
