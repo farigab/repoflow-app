@@ -1,15 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
+import { exec } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { GitCliRepository } from '../infrastructure/git/GitCliRepository';
 import type { WebviewToExtensionMessage } from '../shared/protocol';
 import { DesktopMessageController } from './DesktopMessageController';
 import { DesktopLogger } from './logger';
-import { existsSync } from 'fs';
-import { exec } from 'child_process';
 
 let mainWindow: BrowserWindow | undefined;
 let controller: DesktopMessageController | undefined;
 const WINDOWS_APP_ID = 'com.farigab.repoflow';
+const WINDOWS_CLI_NAME = 'repoflow';
 
 function parseCliRepositoryPaths(argv: string[]): string[] {
   const rawArgs = argv.slice(app.isPackaged ? 1 : 2);
@@ -60,7 +61,7 @@ function resolveWindowsAppId(): string {
 }
 
 function resolveCliPath(): string | undefined {
-  const userArgs = app.isPackaged? process.argv.slice(1) : process.argv.slice(2);
+  const userArgs = app.isPackaged ? process.argv.slice(1) : process.argv.slice(2);
   const pathArg = userArgs.find((arg) => !arg.startsWith('-'));
   if (pathArg) {
     return path.resolve(pathArg);
@@ -78,6 +79,8 @@ function setupCommandLineTool() {
 
   if (process.platform === 'darwin') {
     setupMacOSCLI();
+  } else if (process.platform === 'win32' && app.isPackaged) {
+    setupWindowsCLI();
   }
 }
 
@@ -98,6 +101,55 @@ function setupMacOSCLI() {
       console.info("Symbolic link for CLI created successfully");
     }
   });
+}
+
+function resolveWindowsCliDirectory(): string | undefined {
+  const appDataPath = process.env.APPDATA;
+
+  if (!appDataPath) {
+    return undefined;
+  }
+
+  return path.join(appDataPath, 'npm');
+}
+
+function buildWindowsCmdLauncher(executablePath: string): string {
+  return `@echo off\r\n"${executablePath}" %*\r\n`;
+}
+
+function buildWindowsPowerShellLauncher(executablePath: string): string {
+  const escapedPath = executablePath.replaceAll("'", "''");
+  return `Start-Process -FilePath '${escapedPath}' -ArgumentList $args | Out-Null\r\n`;
+}
+
+function writeFileIfChanged(targetPath: string, content: string): void {
+  if (existsSync(targetPath) && readFileSync(targetPath, 'utf8') === content) {
+    return;
+  }
+
+  mkdirSync(path.dirname(targetPath), { recursive: true });
+  writeFileSync(targetPath, content, 'utf8');
+}
+
+function setupWindowsCLI() {
+  const cliDirectory = resolveWindowsCliDirectory();
+
+  if (!cliDirectory) {
+    return;
+  }
+
+  try {
+    writeFileIfChanged(
+      path.join(cliDirectory, `${WINDOWS_CLI_NAME}.cmd`),
+      buildWindowsCmdLauncher(process.execPath)
+    );
+    writeFileIfChanged(
+      path.join(cliDirectory, `${WINDOWS_CLI_NAME}.ps1`),
+      buildWindowsPowerShellLauncher(process.execPath)
+    );
+  } catch (error) {
+    console.error('Failed to register Windows CLI launcher:', error);
+  }
 }
 
 function applyWindowsTaskbarDetails(window: BrowserWindow): void {
@@ -236,6 +288,7 @@ if (!hasSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+  setupCommandLineTool();
   void createMainWindow(cliRepositoryPaths);
 
   app.on('second-instance', (_event, argv) => {

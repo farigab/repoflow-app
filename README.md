@@ -79,6 +79,8 @@ After that, you can run:
 repoflow "C:\path\to\repo-a" "C:\path\to\repo-b"
 ```
 
+For packaged Windows installs, the app writes `repoflow.cmd` and `repoflow.ps1` into `%AppData%\npm` on first launch. If you previously used `npm link` and the shim is stale, launch RepoFlow once after installing so the built-in launcher replaces it.
+
 To force a repository on startup via environment variable:
 
 ```powershell
@@ -115,17 +117,18 @@ RepoFlow-Setup-<version>.exe
 ## Build for MacOS
 
 **Apple Silicon (ARM64 processor)**
+
 ```sh
 npm run dist:mac
 # the build will be available at `./release/RepoFlow-VER-arm64.dmg`
 ```
 
 **Intel Architecture (x64 processor)**
+
 ```sh
 npm run dist:macx64
 # the build will be available at `./release/RepoFlow-VER.dmg`
 ```
-
 
 ## Already Wired
 
