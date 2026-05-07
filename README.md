@@ -112,6 +112,21 @@ The installer artifact is generated as:
 RepoFlow-Setup-<version>.exe
 ```
 
+## Build for MacOS
+
+**Apple Silicon (ARM64 processor)**
+```sh
+npm run dist:mac
+# the build will be available at `./release/RepoFlow-VER-arm64.dmg`
+```
+
+**Intel Architecture (x64 processor)**
+```sh
+npm run dist:macx64
+# the build will be available at `./release/RepoFlow-VER.dmg`
+```
+
+
 ## Already Wired
 
 - Git graph loading
