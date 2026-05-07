@@ -4,6 +4,8 @@ import { GitCliRepository } from '../infrastructure/git/GitCliRepository';
 import type { WebviewToExtensionMessage } from '../shared/protocol';
 import { DesktopMessageController } from './DesktopMessageController';
 import { DesktopLogger } from './logger';
+import { existsSync } from 'fs';
+import { exec } from 'child_process';
 
 let mainWindow: BrowserWindow | undefined;
 let controller: DesktopMessageController | undefined;
@@ -55,6 +57,47 @@ function resolveWindowIconPath(): string {
 
 function resolveWindowsAppId(): string {
   return app.isPackaged ? WINDOWS_APP_ID : process.execPath;
+}
+
+function resolveCliPath(): string | undefined {
+  const userArgs = app.isPackaged? process.argv.slice(1) : process.argv.slice(2);
+  const pathArg = userArgs.find((arg) => !arg.startsWith('-'));
+  if (pathArg) {
+    return path.resolve(pathArg);
+  }
+
+  return undefined;
+}
+
+function setupCommandLineTool() {
+  const cliPath = resolveCliPath();
+
+  if (cliPath) {
+    process.env.REPOFLOW_REPO = cliPath;
+  }
+
+  if (process.platform === 'darwin') {
+    setupMacOSCLI();
+  }
+}
+
+function setupMacOSCLI() {
+  const target = "/usr/local/bin/repoflow";
+  if (existsSync(target)) {
+    // symbolic link already exists, do nothing
+    return;
+  }
+
+  const content = '#!/bin/bash\\n\\"/Applications/RepoFlow.app/Contents/MacOS/RepoFlow\\" \\"\\$@\\" > /dev/null 2>&1 &\\ndisown\\nexit'
+  const command = `echo "${content}" > ${target} && chmod +x ${target}`;
+
+  exec(command, (error) => {
+    if (error) {
+      console.error("Failed to create symbolic link for CLI:", error);
+    } else {
+      console.info("Symbolic link for CLI created successfully");
+    }
+  });
 }
 
 function applyWindowsTaskbarDetails(window: BrowserWindow): void {
