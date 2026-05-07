@@ -236,8 +236,6 @@ if (!hasSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
-  setupCommandLineTool();
-
   void createMainWindow(cliRepositoryPaths);
 
   app.on('second-instance', (_event, argv) => {
