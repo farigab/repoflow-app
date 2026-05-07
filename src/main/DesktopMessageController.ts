@@ -1,14 +1,15 @@
 import { BrowserWindow, clipboard, dialog, shell } from 'electron';
 import { spawn } from 'node:child_process';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { DiffRequest, GraphFilters, RepoSpecialState } from '../core/models';
 import { GitCliRepository } from '../infrastructure/git/GitCliRepository';
+import { buildPrUrl, resolvePreferredRemoteForPullRequest } from '../presentation/webview/GitGraphUtils';
 import type {
   ExtensionToWebviewMessage,
   RepositoryTabDescriptor,
   WebviewToExtensionMessage
 } from '../shared/protocol';
-import { buildPrUrl, resolvePreferredRemoteForPullRequest } from '../presentation/webview/GitGraphUtils';
 import type { DesktopLogger } from './logger';
 
 type MessageType = WebviewToExtensionMessage['type'];
@@ -29,13 +30,17 @@ const DEFAULT_FILTERS: GraphFilters = {
 
 export class DesktopMessageController {
   private readonly repositorySessions = new Map<string, RepositorySession>();
+  private pendingBootstrapRepositoryPaths: string[];
   private activeRepoRoot?: string;
 
   public constructor(
     private readonly window: BrowserWindow,
     private readonly repository: GitCliRepository,
-    private readonly logger: DesktopLogger
-  ) { }
+    private readonly logger: DesktopLogger,
+    bootstrapRepositoryPaths: string[] = []
+  ) {
+    this.pendingBootstrapRepositoryPaths = bootstrapRepositoryPaths;
+  }
 
   public getCurrentRepositoryRoot(): string | undefined {
     return this.activeRepoRoot;
@@ -51,6 +56,15 @@ export class DesktopMessageController {
     return this.openResolvedRepositories(selectedPaths);
   }
 
+  public async queueBootstrapRepositories(paths: string[]): Promise<boolean> {
+    if (paths.length === 0) {
+      return false;
+    }
+
+    this.pendingBootstrapRepositoryPaths = [];
+    return this.openRepositories(paths);
+  }
+
   public async handleMessage(message: WebviewToExtensionMessage): Promise<void> {
     const handlers: Partial<{ [K in MessageType]: (payload: PayloadFor<K>) => Promise<void> }> = {
       ready: async () => this.handleReady(),
@@ -62,7 +76,6 @@ export class DesktopMessageController {
       selectCommit: async (p) => this.handleSelectCommit(p),
       clearSelectedCommit: async (p) => this.handleClearSelectedCommit(p),
       openDiff: async (p) => this.showDiff(p),
-      createBranchPrompt: async () => this.handleFeatureNeedsModal('Create Branch'),
       createBranch: async (p) => this.handleCreateBranch(p),
       deleteBranch: async (p) => this.handleDeleteBranch(p),
       deleteRemoteBranch: async (p) => this.handleDeleteRemoteBranch(p),
@@ -74,20 +87,25 @@ export class DesktopMessageController {
       dropCommit: async (p) => this.handleDropCommit(p),
       mergeCommit: async (p) => this.handleMergeCommit(p),
       rebaseOnCommit: async (p) => this.handleRebaseOnCommit(p),
-      resetToCommit: async () => this.handleFeatureNeedsModal('Reset Commit'),
       copyHash: async (p) => this.handleCopyHash(p),
       copySubject: async (p) => this.handleCopySubject(p),
       openInTerminal: async (p) => this.handleOpenInTerminal(p),
       stageFile: async (p) => this.handleStageFile(p),
+      stageAll: async (p) => this.handleStageAll(p),
+      unstageAll: async (p) => this.handleUnstageAll(p),
       unstageFile: async (p) => this.handleUnstageFile(p),
       discardFile: async (p) => this.handleDiscardFile(p),
-      commitChangesPrompt: async () => this.handleFeatureNeedsModal('Commit Changes'),
+      commitChanges: async (p) => this.handleCommitChanges(p),
       setGitUserName: async (p) => this.handleSetGitUserName(p),
       setGitUserEmail: async (p) => this.handleSetGitUserEmail(p),
+      setGitHooksPath: async (p) => this.handleSetGitHooksPath(p),
+      openHooksFolder: async (p) => this.handleOpenHooksFolder(p),
+      openHookScript: async (p) => this.handleOpenHookScript(p),
       setRemoteUrl: async (p) => this.handleSetRemoteUrl(p),
       openPullRequest: async (p) => this.handleOpenPullRequest(p),
       listStashes: async (p) => this.handleListStashes(p),
       stashChanges: async (p) => this.handleStashChanges(p),
+      previewStash: async (p) => this.handlePreviewStash(p),
       applyStash: async (p) => this.handleApplyStash(p),
       popStash: async (p) => this.handlePopStash(p),
       dropStash: async (p) => this.handleDropStash(p),
@@ -107,7 +125,11 @@ export class DesktopMessageController {
       pullRepo: async (p) => this.handlePullRepo(p),
       pushRepo: async (p) => this.handlePushRepo(p),
       fetchRepo: async (p) => this.handleFetchRepo(p),
-      openFile: async (p) => this.handleOpenFile(p)
+      openFile: async (p) => this.handleOpenFile(p),
+      compareBranches: async (p) => this.handleCompareBranches(p),
+      listUndoEntries: async (p) => this.handleListUndoEntries(p),
+      undoTo: async (p) => this.handleUndoTo(p),
+      resetToMode: async (p) => this.handleResetToMode(p)
     };
 
     const handler = handlers[message.type];
@@ -182,6 +204,13 @@ export class DesktopMessageController {
     if (this.activeRepoRoot) {
       await this.postRepositoryTabs();
       await this.refresh(this.activeRepoRoot);
+      return;
+    }
+
+    if (this.pendingBootstrapRepositoryPaths.length > 0) {
+      const bootstrapPaths = [...this.pendingBootstrapRepositoryPaths];
+      this.pendingBootstrapRepositoryPaths = [];
+      await this.openRepositories(bootstrapPaths);
       return;
     }
 
@@ -416,6 +445,18 @@ export class DesktopMessageController {
     });
   }
 
+  private async handleStageAll(payload: PayloadFor<'stageAll'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Staging all changes...', async () => {
+      await this.repository.stageAll(payload.repoRoot);
+    });
+  }
+
+  private async handleUnstageAll(payload: PayloadFor<'unstageAll'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Unstaging all changes...', async () => {
+      await this.repository.unstageAll(payload.repoRoot);
+    });
+  }
+
   private async handleUnstageFile(payload: PayloadFor<'unstageFile'>): Promise<void> {
     await this.executeRepositoryAction(payload.repoRoot, 'Unstaging file...', async () => {
       await this.repository.unstageFile(payload.repoRoot, payload.file.path);
@@ -439,9 +480,51 @@ export class DesktopMessageController {
     });
   }
 
+  private async handleCommitChanges(payload: PayloadFor<'commitChanges'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Committing...', async () => {
+      await this.repository.commit(payload.repoRoot, payload.message, payload.amend);
+    });
+  }
+
   private async handleSetGitUserEmail(payload: PayloadFor<'setGitUserEmail'>): Promise<void> {
     await this.executeRepositoryAction(payload.repoRoot, 'Saving user.email...', async () => {
       await this.repository.setGitUserEmail(payload.repoRoot, payload.email);
+    });
+  }
+
+  private async handleSetGitHooksPath(payload: PayloadFor<'setGitHooksPath'>): Promise<void> {
+    await this.executeRepositoryAction(payload.repoRoot, 'Saving core.hooksPath...', async () => {
+      await this.repository.setGitHooksPath(payload.repoRoot, payload.hooksPath);
+    });
+  }
+
+  private async handleOpenHooksFolder(payload: PayloadFor<'openHooksFolder'>): Promise<void> {
+    await this.withBusy('Opening hooks folder...', async () => {
+      const hooksDirectory = await this.repository.resolveHooksDirectory(payload.repoRoot, payload.hooksPath);
+      await fs.mkdir(hooksDirectory, { recursive: true });
+      const result = await shell.openPath(hooksDirectory);
+      if (result) {
+        throw new Error(result);
+      }
+    }).catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.appendLine(`[hooks] ${message}`);
+      await this.postNotification('error', message);
+    });
+  }
+
+  private async handleOpenHookScript(payload: PayloadFor<'openHookScript'>): Promise<void> {
+    await this.withBusy(`Opening ${payload.hookName} hook...`, async () => {
+      const scriptPath = await this.ensureHookScript(payload.repoRoot, payload.hooksPath, payload.hookName);
+      await this.refresh(payload.repoRoot);
+      const result = await shell.openPath(scriptPath);
+      if (result) {
+        throw new Error(result);
+      }
+    }).catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.appendLine(`[hooks] ${message}`);
+      await this.postNotification('error', message);
     });
   }
 
@@ -476,21 +559,31 @@ export class DesktopMessageController {
 
   private async handleStashChanges(payload: PayloadFor<'stashChanges'>): Promise<void> {
     await this.executeRepositoryAction(payload.repoRoot, 'Stashing changes...', async () => {
-      await this.repository.stashChanges(payload.repoRoot, payload.message, payload.includeUntracked);
+      await this.repository.stashChanges(payload.repoRoot, payload.message, payload.includeUntracked, payload.paths);
     });
     await this.handleListStashes({ repoRoot: payload.repoRoot });
   }
 
+  private async handlePreviewStash(payload: PayloadFor<'previewStash'>): Promise<void> {
+    await this.withBusy('Opening stash preview...', async () => {
+      await this.repository.previewStash(payload.repoRoot, payload.ref);
+    }).catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.appendLine(`[stash-preview] ${message}`);
+      await this.postNotification('error', message);
+    });
+  }
+
   private async handleApplyStash(payload: PayloadFor<'applyStash'>): Promise<void> {
     await this.executeRepositoryAction(payload.repoRoot, 'Applying stash...', async () => {
-      await this.repository.applyStash(payload.repoRoot, payload.ref);
+      await this.repository.applyStash(payload.repoRoot, payload.ref, payload.paths);
     });
     await this.handleListStashes({ repoRoot: payload.repoRoot });
   }
 
   private async handlePopStash(payload: PayloadFor<'popStash'>): Promise<void> {
     await this.executeRepositoryAction(payload.repoRoot, 'Popping stash...', async () => {
-      await this.repository.popStash(payload.repoRoot, payload.ref);
+      await this.repository.popStash(payload.repoRoot, payload.ref, payload.paths);
     });
     await this.handleListStashes({ repoRoot: payload.repoRoot });
   }
@@ -600,6 +693,52 @@ export class DesktopMessageController {
 
   private async handleOpenFile(payload: PayloadFor<'openFile'>): Promise<void> {
     await this.repository.openFile(payload.repoRoot, payload.filePath);
+  }
+
+  private async handleCompareBranches(payload: PayloadFor<'compareBranches'>): Promise<void> {
+    await this.withBusy('Comparing branches...', async () => {
+      const result = await this.repository.compareBranches(payload.repoRoot, payload.baseRef, payload.targetRef);
+      await this.postMessage({ type: 'branchCompareResult', payload: result });
+    }).catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.appendLine(`[compare] ${message}`);
+      await this.postNotification('error', message);
+    });
+  }
+
+  private async handleListUndoEntries(payload: PayloadFor<'listUndoEntries'>): Promise<void> {
+    await this.withBusy('Loading undo history...', async () => {
+      const entries = await this.repository.listUndoEntries(payload.repoRoot);
+      await this.postMessage({ type: 'undoEntries', payload: { entries } });
+    }).catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.appendLine(`[undo] ${message}`);
+      await this.postNotification('error', message);
+    });
+  }
+
+  private async handleUndoTo(payload: PayloadFor<'undoTo'>): Promise<void> {
+    if (!await this.confirm(`Undo to ${payload.ref}? This performs a hard reset and can discard uncommitted changes.`, 'Undo')) {
+      return;
+    }
+
+    await this.executeRepositoryAction(payload.repoRoot, 'Undoing last operation...', async () => {
+      await this.repository.undoTo(payload.repoRoot, payload.ref);
+    });
+  }
+
+  private async handleResetToMode(payload: PayloadFor<'resetToMode'>): Promise<void> {
+    if (payload.mode === 'hard' && !await this.confirm(`Hard reset current branch to ${payload.commitHash.slice(0, 8)}? This can discard uncommitted changes.`, 'Reset')) {
+      return;
+    }
+
+    if (payload.mode !== 'hard' && !await this.confirm(`Reset (${payload.mode}) current branch to ${payload.commitHash.slice(0, 8)}?`, 'Reset')) {
+      return;
+    }
+
+    await this.executeRepositoryAction(payload.repoRoot, 'Resetting...', async () => {
+      await this.repository.resetTo(payload.repoRoot, payload.commitHash, payload.mode);
+    });
   }
 
   private async executeRepositoryAction(repoRoot: string, label: string, action: () => Promise<void>): Promise<void> {
@@ -743,11 +882,23 @@ export class DesktopMessageController {
     return result.response === 0;
   }
 
-  private async handleFeatureNeedsModal(featureName: string): Promise<void> {
-    await this.postNotification(
-      'error',
-      `${featureName} precisa virar um modal React no app desktop. A acao foi preservada como ponto de migracao.`
-    );
+  private async ensureHookScript(repoRoot: string, hooksPath: string, hookName: string): Promise<string> {
+    const hooksDirectory = await this.repository.resolveHooksDirectory(repoRoot, hooksPath);
+    await fs.mkdir(hooksDirectory, { recursive: true });
+
+    const scriptPath = path.join(hooksDirectory, hookName);
+    const exists = await fs.stat(scriptPath).then(() => true, () => false);
+    if (!exists) {
+      const template = process.platform === 'win32'
+        ? ['@echo off', 'REM RepoFlow hook', 'git status', ''].join('\r\n')
+        : ['#!/usr/bin/env sh', '# RepoFlow hook', 'git status', ''].join('\n');
+      await fs.writeFile(scriptPath, template, 'utf8');
+      if (process.platform !== 'win32') {
+        await fs.chmod(scriptPath, 0o755).catch(() => undefined);
+      }
+    }
+
+    return scriptPath;
   }
 
   private async withBusy(label: string, action: () => Promise<void>): Promise<void> {

@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { buildGraphRows } from '../../application/graph/buildGraphRows';
 import type {
   BlameEntry,
+  BranchCompareResult,
   BranchSummary,
   CommitDetail,
   CommitStats,
@@ -15,12 +16,22 @@ import type {
   RepoGitConfig,
   RepoSpecialState,
   StashEntry,
+  StashFile,
+  UndoEntry,
   WorkingTreeStatus,
   WorktreeEntry
 } from '../../core/models';
 import type { GitRepository } from '../../core/ports/GitRepository';
 import { EMPTY_TREE } from '../../shared/constants';
 import { GitCache } from './GitCache';
+import {
+  escapePathSpec,
+  parseCompareCommits,
+  parseNameStatusAndNumstat,
+  parseStashFiles,
+  parseStashList,
+  parseUndoEntries
+} from './GitOperationParsers';
 import {
   parseBlameOutput,
   parseBranchList,
@@ -43,43 +54,6 @@ interface GitCliLogger {
 interface GitCliRepositoryOptions {
   getWorkspaceFolders?: () => string[];
   openFileHandler?: (repoRoot: string, filePath: string) => Promise<void>;
-}
-
-function escapePathSpec(filePath: string): string {
-  return filePath.replaceAll('\\', '/');
-}
-
-function parseStashList(raw: string): StashEntry[] {
-  if (!raw.trim()) {
-    return [];
-  }
-
-  const entries: StashEntry[] = [];
-  for (const record of raw.split('\x1e')) {
-    const trimmed = record.trim();
-    if (!trimmed) {
-      continue;
-    }
-
-    const parts = trimmed.split('\x1f');
-    if (parts.length < 3) {
-      continue;
-    }
-
-    const ref = parts[0].trim();
-    const subject = parts[1].trim();
-    const date = parts[2].trim();
-
-    const indexMatch = /stash@\{(\d+)\}/.exec(ref);
-    const index = indexMatch ? Number.parseInt(indexMatch[1], 10) : 0;
-
-    const branchMatch = /^(?:WIP on|On) ([^:]+):/.exec(subject);
-    const branch = branchMatch ? branchMatch[1].trim() : '';
-
-    entries.push({ index, ref, message: subject, branch, date });
-  }
-
-  return entries;
 }
 
 export class GitCliRepository implements GitRepository {
@@ -318,14 +292,33 @@ export class GitCliRepository implements GitRepository {
     this.graphCache.clear();
   }
 
+  public async stageAll(repoRoot: string): Promise<void> {
+    await this.runGit(repoRoot, ['add', '--all']);
+    this.graphCache.clear();
+  }
+
+  public async unstageAll(repoRoot: string): Promise<void> {
+    if (await this.hasHeadCommit(repoRoot)) {
+      await this.runGit(repoRoot, ['restore', '--staged', '--', '.']);
+    } else {
+      await this.runGit(repoRoot, ['rm', '-r', '--cached', '--', '.']);
+    }
+    this.graphCache.clear();
+  }
+
   public async unstageFile(repoRoot: string, targetPath: string): Promise<void> {
-    await this.runGit(repoRoot, ['restore', '--staged', '--', targetPath]);
+    if (await this.hasHeadCommit(repoRoot)) {
+      await this.runGit(repoRoot, ['restore', '--staged', '--', targetPath]);
+    } else {
+      await this.runGit(repoRoot, ['rm', '--cached', '--', targetPath]);
+    }
     this.graphCache.clear();
   }
 
   public async discardFile(repoRoot: string, targetPath: string, tracked: boolean): Promise<void> {
     if (tracked) {
-      await this.runGit(repoRoot, ['restore', '--source=HEAD', '--staged', '--worktree', '--', targetPath]);
+      const restoreSource = await this.hasHeadCommit(repoRoot) ? 'HEAD' : EMPTY_TREE;
+      await this.runGit(repoRoot, ['restore', `--source=${restoreSource}`, '--staged', '--worktree', '--', targetPath]);
     } else {
       await this.runGit(repoRoot, ['clean', '-fd', '--', targetPath]);
     }
@@ -341,6 +334,15 @@ export class GitCliRepository implements GitRepository {
     args.push('-m', message);
     await this.runGit(repoRoot, args);
     this.graphCache.clear();
+  }
+
+  private async hasHeadCommit(repoRoot: string): Promise<boolean> {
+    try {
+      await this.runGit(repoRoot, ['rev-parse', '--verify', 'HEAD']);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   public async createBranch(repoRoot: string, name: string, fromRef?: string): Promise<void> {
@@ -448,6 +450,44 @@ export class GitCliRepository implements GitRepository {
     this.graphCache.clear();
   }
 
+  public async compareBranches(repoRoot: string, baseRef: string, targetRef: string): Promise<BranchCompareResult> {
+    const [countsRaw, commitsAheadRaw, commitsBehindRaw, nameStatusRaw, numstatRaw] = await Promise.all([
+      this.runGit(repoRoot, ['rev-list', '--left-right', '--count', `${baseRef}...${targetRef}`]),
+      this.runGit(repoRoot, ['log', '--date=iso-strict', '--format=%H%x1f%an%x1f%ad%x1f%s%x1e', `${baseRef}..${targetRef}`]),
+      this.runGit(repoRoot, ['log', '--date=iso-strict', '--format=%H%x1f%an%x1f%ad%x1f%s%x1e', `${targetRef}..${baseRef}`]),
+      this.runGit(repoRoot, ['diff', '--name-status', '--find-renames', '--find-copies', `${baseRef}...${targetRef}`]),
+      this.runGit(repoRoot, ['diff', '--numstat', '--find-renames', '--find-copies', `${baseRef}...${targetRef}`])
+    ]);
+
+    const [behindRaw = '0', aheadRaw = '0'] = countsRaw.trim().split(/\s+/);
+    return {
+      baseRef,
+      targetRef,
+      ahead: Number.parseInt(aheadRaw, 10) || 0,
+      behind: Number.parseInt(behindRaw, 10) || 0,
+      commitsAhead: parseCompareCommits(commitsAheadRaw),
+      commitsBehind: parseCompareCommits(commitsBehindRaw),
+      files: parseNameStatusAndNumstat(nameStatusRaw, numstatRaw)
+    };
+  }
+
+  public async listUndoEntries(repoRoot: string): Promise<UndoEntry[]> {
+    const raw = await this.runGit(repoRoot, [
+      'reflog',
+      '-n',
+      '25',
+      '--date=iso-strict',
+      '--format=%H%x1f%gd%x1f%cd%x1f%gs%x1e'
+    ]).catch(() => '');
+
+    return parseUndoEntries(raw).filter((entry) => entry.ref !== 'HEAD@{0}');
+  }
+
+  public async undoTo(repoRoot: string, ref: string): Promise<void> {
+    await this.runGit(repoRoot, ['reset', '--hard', ref]);
+    this.graphCache.clear();
+  }
+
   public async rebase(repoRoot: string, onto: string): Promise<void> {
     await this.runGit(repoRoot, ['rebase', onto]);
     this.graphCache.clear();
@@ -487,11 +527,13 @@ export class GitCliRepository implements GitRepository {
   }
 
   public async getRepoConfig(repoRoot: string): Promise<RepoGitConfig> {
-    const [userName, userEmail, remoteRaw] = await Promise.all([
-      this.runGit(repoRoot, ['config', '--get', 'user.name']).catch(() => ''),
-      this.runGit(repoRoot, ['config', '--get', 'user.email']).catch(() => ''),
+    const [userName, userEmail, hooksPath, remoteRaw] = await Promise.all([
+      this.runGit(repoRoot, ['config', '--get', 'user.name'], { logErrors: false }).catch(() => ''),
+      this.runGit(repoRoot, ['config', '--get', 'user.email'], { logErrors: false }).catch(() => ''),
+      this.runGit(repoRoot, ['config', '--get', 'core.hooksPath'], { logErrors: false }).catch(() => ''),
       this.runGit(repoRoot, ['remote', '-v']).catch(() => '')
     ]);
+    const hookScripts = await this.listHookScripts(repoRoot, hooksPath.trim());
 
     const seenRemotes = new Set<string>();
     const remotes: RepoGitConfig['remotes'] = [];
@@ -503,7 +545,13 @@ export class GitCliRepository implements GitRepository {
       }
     }
 
-    return { userName: userName.trim(), userEmail: userEmail.trim(), remotes };
+    return {
+      userName: userName.trim(),
+      userEmail: userEmail.trim(),
+      hooksPath: hooksPath.trim(),
+      hookScripts,
+      remotes
+    };
   }
 
   public async setGitUserName(repoRoot: string, name: string): Promise<void> {
@@ -516,9 +564,52 @@ export class GitCliRepository implements GitRepository {
     this.graphCache.clear();
   }
 
+  public async setGitHooksPath(repoRoot: string, hooksPath: string): Promise<void> {
+    const trimmed = hooksPath.trim();
+    if (trimmed) {
+      await this.runGit(repoRoot, ['config', 'core.hooksPath', trimmed]);
+    } else {
+      await this.runGit(repoRoot, ['config', '--unset', 'core.hooksPath']).catch(() => undefined);
+    }
+    this.graphCache.clear();
+  }
+
   public async setRemoteUrl(repoRoot: string, remoteName: string, url: string): Promise<void> {
     await this.runGit(repoRoot, ['remote', 'set-url', remoteName, url]);
     this.graphCache.clear();
+  }
+
+  private async listHookScripts(repoRoot: string, hooksPath: string): Promise<string[]> {
+    const hooksDirectory = await this.resolveHooksDirectory(repoRoot, hooksPath);
+    const entries = await fs.readdir(hooksDirectory, { withFileTypes: true }).catch(() => []);
+
+    return entries
+      .filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && !entry.name.endsWith('.sample'))
+      .map((entry) => entry.name)
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  public async resolveHooksDirectory(repoRoot: string, hooksPath: string): Promise<string> {
+    const configuredPath = hooksPath.trim();
+
+    if (configuredPath) {
+      return path.isAbsolute(configuredPath)
+        ? configuredPath
+        : path.resolve(repoRoot, configuredPath);
+    }
+
+    try {
+      const resolvedPath = (await this.runGit(repoRoot, ['rev-parse', '--git-path', 'hooks'])).trim();
+      if (resolvedPath) {
+        return path.isAbsolute(resolvedPath)
+          ? resolvedPath
+          : path.resolve(repoRoot, resolvedPath);
+      }
+    } catch {
+      // Fall back to the default hooks location when Git cannot resolve it.
+    }
+
+    return path.join(repoRoot, '.git', 'hooks');
   }
 
   public async listStashes(repoRoot: string): Promise<StashEntry[]> {
@@ -527,33 +618,72 @@ export class GitCliRepository implements GitRepository {
       '--format=%gd\x1f%s\x1f%ci\x1e'
     ]).catch(() => '');
 
-    return parseStashList(raw);
+    const entries = parseStashList(raw);
+    return Promise.all(entries.map(async (entry) => ({
+      ...entry,
+      files: await this.listStashFiles(repoRoot, entry.ref).catch(() => [])
+    })));
   }
 
   public async stashChanges(repoRoot: string, message?: string, includeUntracked = false, paths?: string[]): Promise<void> {
     const args = ['stash', 'push'];
+    const selectedPaths = this.normalizePathList(paths);
     if (includeUntracked) args.push('--include-untracked');
     if (message?.trim()) args.push('-m', message.trim());
-    if (paths && paths.length > 0) {
-      args.push('--', ...paths);
+    if (selectedPaths.length > 0) {
+      args.push('--', ...selectedPaths);
     }
     await this.runGit(repoRoot, args);
     this.graphCache.clear();
   }
 
-  public async applyStash(repoRoot: string, ref: string): Promise<void> {
-    await this.runGit(repoRoot, ['stash', 'apply', ref]);
+  public async applyStash(repoRoot: string, ref: string, paths?: string[]): Promise<void> {
+    const selectedPaths = this.normalizePathList(paths);
+    if (selectedPaths.length === 0) {
+      await this.runGit(repoRoot, ['stash', 'apply', ref]);
+      this.graphCache.clear();
+      return;
+    }
+
+    const files = await this.listStashFiles(repoRoot, ref).catch(() => []);
+    await this.restoreStashPaths(repoRoot, ref, selectedPaths, files);
     this.graphCache.clear();
   }
 
-  public async popStash(repoRoot: string, ref: string): Promise<void> {
-    await this.runGit(repoRoot, ['stash', 'pop', ref]);
+  public async popStash(repoRoot: string, ref: string, paths?: string[]): Promise<void> {
+    const selectedPaths = this.normalizePathList(paths);
+    if (selectedPaths.length === 0) {
+      await this.runGit(repoRoot, ['stash', 'pop', ref]);
+      this.graphCache.clear();
+      return;
+    }
+
+    const files = await this.listStashFiles(repoRoot, ref).catch(() => []);
+    await this.restoreStashPaths(repoRoot, ref, selectedPaths, files);
+
+    const allPaths = new Set(files.map((file) => escapePathSpec(file.path)));
+    const selectedAllPaths = allPaths.size > 0
+      && selectedPaths.length >= allPaths.size
+      && selectedPaths.every((filePath) => allPaths.has(filePath));
+    if (selectedAllPaths) {
+      await this.runGit(repoRoot, ['stash', 'drop', ref]);
+    }
+
     this.graphCache.clear();
   }
 
   public async dropStash(repoRoot: string, ref: string): Promise<void> {
     await this.runGit(repoRoot, ['stash', 'drop', ref]);
     this.graphCache.clear();
+  }
+
+  public async previewStash(repoRoot: string, ref: string): Promise<void> {
+    const files = await this.listStashFiles(repoRoot, ref);
+    if (files.length === 0) {
+      throw new Error(`No files found in ${ref}.`);
+    }
+
+    await this.openStashFileDiff(repoRoot, ref, files[0]);
   }
 
   public async getBlame(repoRoot: string, relativeFilePath: string): Promise<BlameEntry[]> {
@@ -708,6 +838,73 @@ export class GitCliRepository implements GitRepository {
       const msg = error instanceof Error ? error.message : String(error);
       this.output.appendLine(`[openFile] Failed to open ${repoRoot}/${filePath}: ${msg}`);
     }
+  }
+
+  private async listStashFiles(repoRoot: string, ref: string): Promise<StashFile[]> {
+    const raw = await this.runGit(repoRoot, [
+      'stash',
+      'show',
+      '--include-untracked',
+      '--name-status',
+      '--find-renames',
+      '--find-copies',
+      '-z',
+      ref
+    ], { logErrors: false }).catch(() => '');
+
+    return parseStashFiles(raw);
+  }
+
+  private async restoreStashPaths(repoRoot: string, ref: string, paths: string[], files: StashFile[]): Promise<void> {
+    const fileByPath = new Map(files.map((file) => [escapePathSpec(file.path), file]));
+    const expandedPaths = new Set(paths);
+    for (const filePath of paths) {
+      const originalPath = fileByPath.get(filePath)?.originalPath;
+      if (originalPath) {
+        expandedPaths.add(escapePathSpec(originalPath));
+      }
+    }
+
+    for (const filePath of expandedPaths) {
+      const sources = [ref, `${ref}^3`];
+      let lastError: unknown;
+
+      for (const source of sources) {
+        try {
+          await this.runGit(repoRoot, ['restore', '--source', source, '--worktree', '--', filePath], { logErrors: false });
+          lastError = undefined;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
+    }
+  }
+
+  private async openStashFileDiff(repoRoot: string, ref: string, file: StashFile): Promise<void> {
+    const leftPath = file.originalPath ?? file.path;
+    await this.openDiffHandler({
+      repoRoot,
+      commitHash: ref,
+      parentHash: `${ref}^1`,
+      filePath: file.path,
+      originalPath: leftPath
+    });
+  }
+
+  private normalizePathList(paths?: string[]): string[] {
+    const normalized = new Set<string>();
+    for (const filePath of paths ?? []) {
+      const cleanPath = escapePathSpec(filePath);
+      if (cleanPath.trim()) {
+        normalized.add(cleanPath);
+      }
+    }
+    return [...normalized];
   }
 
   private hasDirtyChanges(localChanges: WorkingTreeStatus): boolean {

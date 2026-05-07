@@ -9,6 +9,46 @@ let mainWindow: BrowserWindow | undefined;
 let controller: DesktopMessageController | undefined;
 const WINDOWS_APP_ID = 'com.farigab.repoflow';
 
+function parseCliRepositoryPaths(argv: string[]): string[] {
+  const rawArgs = argv.slice(app.isPackaged ? 1 : 2);
+  const repositoryPaths: string[] = [];
+
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const arg = rawArgs[index];
+
+    if (!arg) {
+      continue;
+    }
+
+    if (arg === '--') {
+      repositoryPaths.push(...rawArgs.slice(index + 1));
+      break;
+    }
+
+    if (arg === '--repo' || arg === '-r') {
+      const nextArg = rawArgs[index + 1];
+      if (nextArg) {
+        repositoryPaths.push(nextArg);
+        index += 1;
+      }
+      continue;
+    }
+
+    if (arg.startsWith('--repo=')) {
+      repositoryPaths.push(arg.slice('--repo='.length));
+      continue;
+    }
+
+    if (arg.startsWith('-')) {
+      continue;
+    }
+
+    repositoryPaths.push(arg);
+  }
+
+  return Array.from(new Set(repositoryPaths.map((entry) => path.resolve(entry))));
+}
+
 function resolveWindowIconPath(): string {
   return path.join(__dirname, '../renderer/icon.png');
 }
@@ -87,7 +127,7 @@ function createApplicationMenu(
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-async function createMainWindow(): Promise<void> {
+async function createMainWindow(bootstrapRepositoryPaths: string[] = []): Promise<void> {
   const logger = new DesktopLogger();
 
   const repository = new GitCliRepository(
@@ -129,7 +169,7 @@ async function createMainWindow(): Promise<void> {
 
   applyWindowsTaskbarDetails(mainWindow);
 
-  controller = new DesktopMessageController(mainWindow, repository, logger);
+  controller = new DesktopMessageController(mainWindow, repository, logger, bootstrapRepositoryPaths);
   createApplicationMenu(controller, mainWindow);
 
   ipcMain.removeAllListeners('repoflow:message');
@@ -145,8 +185,30 @@ async function createMainWindow(): Promise<void> {
   await mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 }
 
+const cliRepositoryPaths = parseCliRepositoryPaths(process.argv);
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 app.whenReady().then(() => {
-  void createMainWindow();
+  void createMainWindow(cliRepositoryPaths);
+
+  app.on('second-instance', (_event, argv) => {
+    const nextRepositoryPaths = parseCliRepositoryPaths(argv);
+
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+    }
+
+    if (nextRepositoryPaths.length > 0) {
+      void controller?.queueBootstrapRepositories(nextRepositoryPaths);
+    }
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
