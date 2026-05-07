@@ -1,6 +1,7 @@
-import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  BranchCompareResult,
   CommitDetail,
   CommitFileChange,
   CommitSummary,
@@ -9,21 +10,27 @@ import type {
   GraphFilters,
   GraphSnapshot,
   StashEntry,
+  UndoEntry,
   WorkingTreeFile,
   WorktreeEntry
 } from '../core/models';
 import type { ExtensionToWebviewMessage, RepositoryTabDescriptor } from '../shared/protocol';
-import { CommitDetails } from './components/CommitDetails';
+import { BranchCompareModal } from './components/BranchCompareModal';
 import { BranchesModal } from './components/BranchesModal';
+import { CommitChangesModal } from './components/CommitChangesModal';
+import { CommitDetails } from './components/CommitDetails';
+import { CreateBranchFromCommitModal } from './components/CreateBranchFromCommitModal';
 import { CreatePRModal } from './components/CreatePRModal';
 import { DeleteBranchesModal } from './components/DeleteBranchesModal';
 import { DiffViewer } from './components/DiffViewer';
 import { GraphCanvas } from './components/GraphCanvas';
 import { LocalChangesPanel } from './components/LocalChangesPanel';
+import { RepoSettingsModal } from './components/RepoSettingsModal';
 import { RepositorySelectionScreen } from './components/RepositorySelectionScreen';
 import { RepositoryTabs } from './components/RepositoryTabs';
-import { RepoSettingsModal } from './components/RepoSettingsModal';
+import { ResetCommitModal } from './components/ResetCommitModal';
 import { StashModal } from './components/StashModal';
+import { UndoModal } from './components/UndoModal';
 import { WorktreeModal } from './components/WorktreeModal';
 import { useResizableSplit } from './hooks/useResizableSplit';
 import { vscode } from './vscode';
@@ -76,7 +83,14 @@ export function App() {
   const [stashOpen, setStashOpen] = useState(false);
   const [stashes, setStashes] = useState<StashEntry[]>([]);
   const [worktreeOpen, setWorktreeOpen] = useState(false);
+  const [branchCompareOpen, setBranchCompareOpen] = useState(false);
+  const [undoOpen, setUndoOpen] = useState(false);
+  const [commitModalOpen, setCommitModalOpen] = useState(false);
+  const [createBranchCommit, setCreateBranchCommit] = useState<CommitSummary | null>(null);
+  const [resetCommit, setResetCommit] = useState<CommitSummary | null>(null);
   const [worktrees, setWorktrees] = useState<WorktreeEntry[]>([]);
+  const [compareResult, setCompareResult] = useState<BranchCompareResult | null>(null);
+  const [undoEntries, setUndoEntries] = useState<UndoEntry[]>([]);
   const [worktreeError, setWorktreeError] = useState<{ message: string; path?: string; canForce?: boolean } | null>(null);
   const [diffView, setDiffView] = useState<DiffViewPayload | null>(null);
   const [isUncommittedSelected, setIsUncommittedSelected] = useState(false);
@@ -167,6 +181,12 @@ export function App() {
           }
           setWorktreeError(message.payload);
           return;
+        case 'branchCompareResult':
+          setCompareResult(message.payload);
+          return;
+        case 'undoEntries':
+          setUndoEntries(message.payload.entries);
+          return;
         default:
           return;
       }
@@ -192,6 +212,13 @@ export function App() {
     setStashes([]);
     setWorktreeOpen(false);
     setWorktrees([]);
+    setBranchCompareOpen(false);
+    setUndoOpen(false);
+    setCommitModalOpen(false);
+    setCreateBranchCommit(null);
+    setResetCommit(null);
+    setCompareResult(null);
+    setUndoEntries([]);
     setWorktreeError(null);
   }, [activeRepoRoot]);
 
@@ -330,7 +357,7 @@ export function App() {
 
   const handleCommit = useCallback((): void => {
     if (!activeSnapshot) return;
-    vscode.postMessage({ type: 'commitChangesPrompt', payload: { repoRoot: activeSnapshot.repoRoot } });
+    setCommitModalOpen(true);
   }, [activeSnapshot]);
 
   const handleContextAction = useCallback((action: 'checkout' | 'cherryPick' | 'revert' | 'drop' | 'createBranch' | 'merge' | 'rebase' | 'reset' | 'copyHash' | 'copySubject' | 'openTerminal'): void => {
@@ -340,7 +367,7 @@ export function App() {
 
     switch (action) {
       case 'createBranch':
-        vscode.postMessage({ type: 'createBranchPrompt', payload: { repoRoot: activeSnapshot.repoRoot, fromRef: contextMenu.commit.hash } });
+        setCreateBranchCommit(contextMenu.commit);
         break;
       case 'checkout':
         vscode.postMessage({ type: 'checkoutCommit', payload: { repoRoot: activeSnapshot.repoRoot, commitHash: contextMenu.commit.hash } });
@@ -361,7 +388,7 @@ export function App() {
         vscode.postMessage({ type: 'rebaseOnCommit', payload: { repoRoot: activeSnapshot.repoRoot, commitHash: contextMenu.commit.hash } });
         break;
       case 'reset':
-        vscode.postMessage({ type: 'resetToCommit', payload: { repoRoot: activeSnapshot.repoRoot, commitHash: contextMenu.commit.hash } });
+        setResetCommit(contextMenu.commit);
         break;
       case 'copyHash':
         vscode.postMessage({ type: 'copyHash', payload: { hash: contextMenu.commit.hash } });
@@ -425,6 +452,18 @@ export function App() {
     setWorktreeOpen(true);
   }, [activeSnapshot]);
 
+  const handleOpenBranchCompareModal = useCallback(() => {
+    setCompareResult(null);
+    setBranchCompareOpen(true);
+  }, []);
+
+  const handleOpenUndoModal = useCallback(() => {
+    if (activeSnapshot) {
+      vscode.postMessage({ type: 'listUndoEntries', payload: { repoRoot: activeSnapshot.repoRoot } });
+    }
+    setUndoOpen(true);
+  }, [activeSnapshot]);
+
   const handleCloseCommitDetails = useCallback(() => {
     if (activeSnapshot) {
       vscode.postMessage({ type: 'clearSelectedCommit', payload: { repoRoot: activeSnapshot.repoRoot } });
@@ -479,6 +518,8 @@ export function App() {
           onOpenDeleteBranches={() => setDeleteBranchesOpen(true)}
           onOpenStashModal={handleOpenStashModal}
           onOpenWorktreeModal={handleOpenWorktreeModal}
+          onOpenBranchCompareModal={handleOpenBranchCompareModal}
+          onOpenUndoModal={handleOpenUndoModal}
           onBannerAction={handleBannerAction}
           onOpenConflictFile={handleOpenConflictFile}
         />
@@ -610,6 +651,40 @@ export function App() {
           busy={busy.value}
           worktreeError={worktreeError}
           onClose={() => { setWorktreeOpen(false); setWorktreeError(null); }}
+        />
+      ) : null}
+      {branchCompareOpen && activeSnapshot ? (
+        <BranchCompareModal
+          snapshot={activeSnapshot}
+          result={compareResult}
+          onClose={() => setBranchCompareOpen(false)}
+        />
+      ) : null}
+      {undoOpen && activeSnapshot ? (
+        <UndoModal
+          snapshot={activeSnapshot}
+          entries={undoEntries}
+          onClose={() => setUndoOpen(false)}
+        />
+      ) : null}
+      {commitModalOpen && activeSnapshot ? (
+        <CommitChangesModal
+          snapshot={activeSnapshot}
+          onClose={() => setCommitModalOpen(false)}
+        />
+      ) : null}
+      {createBranchCommit && activeSnapshot ? (
+        <CreateBranchFromCommitModal
+          snapshot={activeSnapshot}
+          commit={createBranchCommit}
+          onClose={() => setCreateBranchCommit(null)}
+        />
+      ) : null}
+      {resetCommit && activeSnapshot ? (
+        <ResetCommitModal
+          snapshot={activeSnapshot}
+          commit={resetCommit}
+          onClose={() => setResetCommit(null)}
         />
       ) : null}
     </main>

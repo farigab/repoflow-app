@@ -2,6 +2,9 @@ import { useState } from 'react';
 import type { BranchSummary, GraphFilters, GraphSnapshot } from '../../core/models';
 import { vscode } from '../vscode';
 
+const COMMON_HOOKS = ['pre-commit', 'commit-msg', 'pre-push'] as const;
+const VALID_HOOK_NAME = /^[a-z0-9][a-z0-9-]*$/i;
+
 interface RepoSettingsModalProps {
     snapshot: GraphSnapshot;
     filters: GraphFilters;
@@ -31,9 +34,20 @@ export function RepoSettingsModal({ snapshot, filters, onChangeFilters, onClose 
 
     const [userName, setUserName] = useState(snapshot.repoConfig.userName);
     const [userEmail, setUserEmail] = useState(snapshot.repoConfig.userEmail);
+    const [hooksPath, setHooksPath] = useState(snapshot.repoConfig.hooksPath);
+    const [customHookName, setCustomHookName] = useState('');
     const [remoteUrls, setRemoteUrls] = useState<Record<string, string>>(
         Object.fromEntries(snapshot.repoConfig.remotes.map((r) => [r.name, r.url]))
     );
+    const normalizedHooksPath = hooksPath.trim();
+    const displayedHooksPath = normalizedHooksPath || '.git/hooks (default)';
+    const existingHooks = snapshot.repoConfig.hookScripts;
+    const existingHookSet = new Set(existingHooks);
+    const customHooks = existingHooks.filter((hookName) => !COMMON_HOOKS.includes(hookName as typeof COMMON_HOOKS[number]));
+    const configuredCommonHooks = COMMON_HOOKS.filter((hookName) => existingHookSet.has(hookName)).length;
+    const missingCommonHooks = COMMON_HOOKS.length - configuredCommonHooks;
+    const trimmedCustomHookName = customHookName.trim();
+    const customHookNameIsValid = VALID_HOOK_NAME.test(trimmedCustomHookName);
 
     const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (e.target === e.currentTarget) {
@@ -55,6 +69,35 @@ export function RepoSettingsModal({ snapshot, filters, onChangeFilters, onClose 
         }
     };
 
+    const saveHooksPath = () => {
+        const trimmed = normalizedHooksPath;
+        const original = snapshot.repoConfig.hooksPath.trim();
+        if (trimmed !== original) {
+            vscode.postMessage({ type: 'setGitHooksPath', payload: { repoRoot: snapshot.repoRoot, hooksPath: trimmed } });
+        }
+    };
+
+    const postHooksAction = (message: { type: 'openHooksFolder'; payload: { repoRoot: string; hooksPath: string } } | { type: 'openHookScript'; payload: { repoRoot: string; hooksPath: string; hookName: string } }) => {
+        const original = snapshot.repoConfig.hooksPath.trim();
+        if (normalizedHooksPath !== original) {
+            vscode.postMessage({ type: 'setGitHooksPath', payload: { repoRoot: snapshot.repoRoot, hooksPath: normalizedHooksPath } });
+        }
+        vscode.postMessage(message);
+    };
+
+    const openHookScript = (hookName: string) => {
+        postHooksAction({ type: 'openHookScript', payload: { repoRoot: snapshot.repoRoot, hooksPath: normalizedHooksPath, hookName } });
+    };
+
+    const submitCustomHook = () => {
+        if (!customHookNameIsValid) {
+            return;
+        }
+
+        openHookScript(trimmedCustomHookName);
+        setCustomHookName('');
+    };
+
     const saveRemoteUrl = (remoteName: string) => {
         const url = (remoteUrls[remoteName] ?? '').trim();
         const original = snapshot.repoConfig.remotes.find((r) => r.name === remoteName)?.url ?? '';
@@ -66,8 +109,11 @@ export function RepoSettingsModal({ snapshot, filters, onChangeFilters, onClose 
     return (
         <div className="modal-backdrop" onClick={handleBackdropClick}>
             <div className="modal" role="dialog" aria-modal="true" aria-label="Repository Settings">
-                <header className="modal__header">
-                    <h2>Repository Settings</h2>
+                <header className="modal__header modal__header--hero">
+                    <div className="modal__title-group">
+                        <span className="modal__eyebrow">{repoName}</span>
+                        <h2>Repository Settings</h2>
+                    </div>
                     <button type="button" className="modal__close" onClick={onClose} aria-label="Close">
                         <i className="codicon codicon-close" aria-hidden="true" />
                     </button>
@@ -113,6 +159,106 @@ export function RepoSettingsModal({ snapshot, filters, onChangeFilters, onClose 
                                     }
                                 }}
                             />
+                        </div>
+                    </section>
+
+                    <section className="settings-section">
+                        <h3 className="settings-section__title">Git Hooks</h3>
+                        <div className="settings-hook-overview">
+                            <div className="settings-hook-overview__copy">
+                                <span className="settings-hook-overview__eyebrow">Active path</span>
+                                <strong>{displayedHooksPath}</strong>
+                                <p>Open the hooks folder, then create or edit the scripts you actually use.</p>
+                                <div className="settings-hook-metrics" aria-label="Hook summary">
+                                    <span className="settings-hook-metric settings-hook-metric--ready">{configuredCommonHooks} ready</span>
+                                    <span className="settings-hook-metric settings-hook-metric--pending">{missingCommonHooks} missing</span>
+                                    <span className="settings-hook-metric">{customHooks.length} custom</span>
+                                </div>
+                            </div>
+                            <div className="settings-actions settings-actions--wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => postHooksAction({ type: 'openHooksFolder', payload: { repoRoot: snapshot.repoRoot, hooksPath: normalizedHooksPath } })}
+                                >
+                                    <i className="codicon codicon-folder-opened" aria-hidden="true" />
+                                    Open folder
+                                </button>
+                                <button type="button" onClick={() => openHookScript('pre-commit')}>
+                                    <i className="codicon codicon-edit" aria-hidden="true" />
+                                    {existingHookSet.has('pre-commit') ? 'Edit pre-commit' : 'Create pre-commit'}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="settings-row">
+                            <label className="settings-row__label" htmlFor="settings-hookspath">Hooks path</label>
+                            <div className="settings-editable settings-editable--stack">
+                                <input
+                                    id="settings-hookspath"
+                                    type="text"
+                                    className="settings-input settings-input--wide"
+                                    value={hooksPath}
+                                    onChange={(e) => setHooksPath(e.target.value)}
+                                    onBlur={saveHooksPath}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { saveHooksPath(); (e.target as HTMLInputElement).blur(); } }}
+                                    placeholder=".githooks"
+                                />
+                                <p className="settings-help">Leave empty to use the default `.git/hooks` directory.</p>
+                            </div>
+                        </div>
+                        <div className="settings-row settings-row--top">
+                            <span className="settings-row__label">Starter hooks</span>
+                            <div className="settings-editable settings-editable--stack">
+                                <div className="settings-hook-list">
+                                    {COMMON_HOOKS.map((hookName) => (
+                                        <button
+                                            key={hookName}
+                                            type="button"
+                                            className="settings-hook-item"
+                                            onClick={() => openHookScript(hookName)}
+                                        >
+                                            <span className={`settings-hook-item__status ${existingHookSet.has(hookName) ? 'settings-hook-item__status--exists' : 'settings-hook-item__status--missing'}`}>
+                                                <i className={`codicon ${existingHookSet.has(hookName) ? 'codicon-check' : 'codicon-close'}`} aria-hidden="true" />
+                                            </span>
+                                            <span className="settings-hook-item__name">{hookName}</span>
+                                            <span className="settings-hook-item__state">{existingHookSet.has(hookName) ? 'Open script' : 'Create script'}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="settings-help">These are the hooks most teams usually wire first. Clicking opens the file or creates a starter script.</p>
+                            </div>
+                        </div>
+                        <div className="settings-row settings-row--top">
+                            <span className="settings-row__label">Custom hooks</span>
+                            <div className="settings-editable settings-editable--stack">
+                                <div className="settings-custom-hook">
+                                    <input
+                                        type="text"
+                                        className="settings-input settings-input--wide"
+                                        value={customHookName}
+                                        onChange={(e) => setCustomHookName(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { submitCustomHook(); } }}
+                                        placeholder="post-merge"
+                                        aria-label="Custom hook name"
+                                    />
+                                    <button type="button" onClick={submitCustomHook} disabled={!customHookNameIsValid}>
+                                        <i className="codicon codicon-add" aria-hidden="true" />
+                                        Open or create
+                                    </button>
+                                </div>
+                                <p className="settings-help">Use any valid Git hook name, for example pre-rebase, post-merge or prepare-commit-msg.</p>
+                                {customHooks.length > 0 ? (
+                                    <div className="settings-actions settings-actions--wrap">
+                                        {customHooks.map((hookName) => (
+                                            <button key={hookName} type="button" onClick={() => openHookScript(hookName)}>
+                                                <i className="codicon codicon-edit" aria-hidden="true" />
+                                                {hookName}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="settings-help">No custom hooks created yet.</p>
+                                )}
+                            </div>
                         </div>
                     </section>
 
