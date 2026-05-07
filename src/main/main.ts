@@ -91,7 +91,7 @@ function setupMacOSCLI() {
     return;
   }
 
-  const content = '#!/bin/bash\\n\\"/Applications/RepoFlow.app/Contents/MacOS/RepoFlow\\" \\"\\$@\\" > /dev/null 2>&1 &\\ndisown\\nexit'
+  const content = String.raw`#!/bin/bash\n\"/Applications/RepoFlow.app/Contents/MacOS/RepoFlow\" \"\$@\" > /dev/null 2>&1 &\ndisown\nexit`;
   const command = `echo "${content}" > ${target} && chmod +x ${target}`;
 
   exec(command, (error) => {
@@ -113,13 +113,18 @@ function resolveWindowsCliDirectory(): string | undefined {
   return path.join(appDataPath, 'npm');
 }
 
-function buildWindowsCmdLauncher(executablePath: string): string {
-  return `@echo off\r\n"${executablePath}" %*\r\n`;
+function buildWindowsCmdLauncher(): string {
+  return `@echo off\r\npowershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0${WINDOWS_CLI_NAME}.ps1" %*\r\n`;
 }
 
 function buildWindowsPowerShellLauncher(executablePath: string): string {
   const escapedPath = executablePath.replaceAll("'", "''");
-  return `Start-Process -FilePath '${escapedPath}' -ArgumentList $args | Out-Null\r\n`;
+  return [
+    `$escapedArgs = @($args | ForEach-Object { '"' + ($_ -replace '"', '""') + '"' })`,
+    `$command = '"${escapedPath}"'`,
+    `if ($escapedArgs.Length -gt 0) { $command += " " + ($escapedArgs -join " ") }`,
+    `Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $command } | Out-Null`
+  ].join('\r\n') + '\r\n';
 }
 
 function writeFileIfChanged(targetPath: string, content: string): void {
@@ -141,7 +146,7 @@ function setupWindowsCLI() {
   try {
     writeFileIfChanged(
       path.join(cliDirectory, `${WINDOWS_CLI_NAME}.cmd`),
-      buildWindowsCmdLauncher(process.execPath)
+      buildWindowsCmdLauncher()
     );
     writeFileIfChanged(
       path.join(cliDirectory, `${WINDOWS_CLI_NAME}.ps1`),

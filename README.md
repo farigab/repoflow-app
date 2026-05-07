@@ -79,6 +79,8 @@ After that, you can run:
 repoflow "C:\path\to\repo-a" "C:\path\to\repo-b"
 ```
 
+On Windows, the linked `repoflow` launcher now starts RepoFlow detached from the current terminal, so closing PowerShell after launch does not close the app.
+
 For packaged Windows installs, the app writes `repoflow.cmd` and `repoflow.ps1` into `%AppData%\npm` on first launch. If you previously used `npm link` and the shim is stale, launch RepoFlow once after installing so the built-in launcher replaces it.
 
 To force a repository on startup via environment variable:

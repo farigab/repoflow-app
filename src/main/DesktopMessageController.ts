@@ -23,6 +23,10 @@ interface RepositorySession {
   pendingRevealHash?: string;
 }
 
+interface OpenRepositoryOptions {
+  notifyOnError?: boolean;
+}
+
 const DEFAULT_FILTERS: GraphFilters = {
   includeRemotes: true,
   limit: 200
@@ -51,9 +55,12 @@ export class DesktopMessageController {
     return this.openResolvedRepositories(selectedPaths);
   }
 
-  public async openRepositories(preferredPaths?: string[]): Promise<boolean> {
+  public async openRepositories(
+    preferredPaths?: string[],
+    options?: OpenRepositoryOptions
+  ): Promise<boolean> {
     const selectedPaths = preferredPaths ?? await this.pickRepositoryPaths(true);
-    return this.openResolvedRepositories(selectedPaths);
+    return this.openResolvedRepositories(selectedPaths, options);
   }
 
   public async queueBootstrapRepositories(paths: string[]): Promise<boolean> {
@@ -62,7 +69,7 @@ export class DesktopMessageController {
     }
 
     this.pendingBootstrapRepositoryPaths = [];
-    return this.openRepositories(paths);
+    return this.openRepositories(paths, { notifyOnError: false });
   }
 
   public async handleMessage(message: WebviewToExtensionMessage): Promise<void> {
@@ -210,17 +217,19 @@ export class DesktopMessageController {
     if (this.pendingBootstrapRepositoryPaths.length > 0) {
       const bootstrapPaths = [...this.pendingBootstrapRepositoryPaths];
       this.pendingBootstrapRepositoryPaths = [];
-      await this.openRepositories(bootstrapPaths);
+      await this.openRepositories(bootstrapPaths, { notifyOnError: false });
       return;
     }
 
     const bootstrapRepo = process.env.REPOFLOW_REPO;
     if (bootstrapRepo) {
-      await this.openRepository(bootstrapRepo);
+      await this.openResolvedRepositories([bootstrapRepo], { notifyOnError: false });
       return;
     }
 
-    await this.postRepositoryTabs();
+    if (!await this.openRepository()) {
+      await this.postRepositoryTabs();
+    }
   }
 
   private async handleOpenRepositoryPicker(payload: PayloadFor<'openRepositoryPicker'>): Promise<void> {
@@ -782,10 +791,15 @@ export class DesktopMessageController {
     return false;
   }
 
-  private async openResolvedRepositories(selectedPaths: string[]): Promise<boolean> {
+  private async openResolvedRepositories(
+    selectedPaths: string[],
+    options: OpenRepositoryOptions = {}
+  ): Promise<boolean> {
     if (selectedPaths.length === 0) {
       return false;
     }
+
+    const notifyOnError = options.notifyOnError ?? true;
 
     const resolvedRoots: string[] = [];
     const errors: string[] = [];
@@ -803,8 +817,10 @@ export class DesktopMessageController {
 
     const uniqueRoots = Array.from(new Set(resolvedRoots));
     if (uniqueRoots.length === 0) {
-      if (errors.length > 0) {
+      if (notifyOnError && errors.length > 0) {
         await this.postNotification('error', errors[0]);
+      } else if (errors.length > 0) {
+        this.logger.appendLine(`[bootstrap] Ignoring invalid repository path: ${errors[0]}`);
       }
       await this.postRepositoryTabs();
       return false;
@@ -814,8 +830,10 @@ export class DesktopMessageController {
     await this.postRepositoryTabs();
     await this.refresh(this.activeRepoRoot);
 
-    if (errors.length > 0) {
+    if (notifyOnError && errors.length > 0) {
       await this.postNotification('error', errors[0]);
+    } else if (errors.length > 0) {
+      this.logger.appendLine(`[bootstrap] Ignoring invalid repository path: ${errors[0]}`);
     }
 
     return true;
