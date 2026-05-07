@@ -481,7 +481,6 @@ export function App() {
       <RepositorySelectionScreen
         hero={assets.hero}
         onOpenSingle={handleOpenSingleRepository}
-        onOpenMultiple={handleOpenMultipleRepositories}
       />
     );
   } else if (!activeSnapshot) {

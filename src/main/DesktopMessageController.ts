@@ -30,13 +30,17 @@ const DEFAULT_FILTERS: GraphFilters = {
 
 export class DesktopMessageController {
   private readonly repositorySessions = new Map<string, RepositorySession>();
+  private pendingBootstrapRepositoryPaths: string[];
   private activeRepoRoot?: string;
 
   public constructor(
     private readonly window: BrowserWindow,
     private readonly repository: GitCliRepository,
-    private readonly logger: DesktopLogger
-  ) { }
+    private readonly logger: DesktopLogger,
+    bootstrapRepositoryPaths: string[] = []
+  ) {
+    this.pendingBootstrapRepositoryPaths = bootstrapRepositoryPaths;
+  }
 
   public getCurrentRepositoryRoot(): string | undefined {
     return this.activeRepoRoot;
@@ -50,6 +54,15 @@ export class DesktopMessageController {
   public async openRepositories(preferredPaths?: string[]): Promise<boolean> {
     const selectedPaths = preferredPaths ?? await this.pickRepositoryPaths(true);
     return this.openResolvedRepositories(selectedPaths);
+  }
+
+  public async queueBootstrapRepositories(paths: string[]): Promise<boolean> {
+    if (paths.length === 0) {
+      return false;
+    }
+
+    this.pendingBootstrapRepositoryPaths = [];
+    return this.openRepositories(paths);
   }
 
   public async handleMessage(message: WebviewToExtensionMessage): Promise<void> {
@@ -189,6 +202,13 @@ export class DesktopMessageController {
     if (this.activeRepoRoot) {
       await this.postRepositoryTabs();
       await this.refresh(this.activeRepoRoot);
+      return;
+    }
+
+    if (this.pendingBootstrapRepositoryPaths.length > 0) {
+      const bootstrapPaths = [...this.pendingBootstrapRepositoryPaths];
+      this.pendingBootstrapRepositoryPaths = [];
+      await this.openRepositories(bootstrapPaths);
       return;
     }
 

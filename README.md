@@ -47,14 +47,46 @@ npm install
 npm run start
 ```
 
-To force a repository on startup:
+To open repositories from the CLI in development:
+
+```powershell
+npm run start -- "C:\path\to\repo-a" "C:\path\to\repo-b"
+```
+
+You can also pass explicit flags:
+
+```powershell
+npm run start -- --repo "C:\path\to\repo-a" --repo "C:\path\to\repo-b"
+```
+
+For the packaged app:
+
+```powershell
+"C:\Program Files\RepoFlow\RepoFlow.exe" "C:\path\to\repo-a" "C:\path\to\repo-b"
+```
+
+If RepoFlow is already open, running the executable again with repository paths will focus the existing window and add the repositories as new tabs.
+
+To register the `repoflow` command globally in your user profile during development:
+
+```powershell
+npm link
+```
+
+After that, you can run:
+
+```powershell
+repoflow "C:\path\to\repo-a" "C:\path\to\repo-b"
+```
+
+To force a repository on startup via environment variable:
 
 ```powershell
 $env:REPOFLOW_REPO="C:\path\to\repo"
 npm run start
 ```
 
-If `REPOFLOW_REPO` is not set, the app tries the current working directory and then opens a folder picker.
+If no repository path is provided, the app opens normally and you can choose a repository from the UI.
 
 ## Build For Windows
 
