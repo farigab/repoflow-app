@@ -1,6 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
-import { exec } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { GitCliRepository } from '../infrastructure/git/GitCliRepository';
 import type { WebviewToExtensionMessage } from '../shared/protocol';
@@ -91,16 +90,20 @@ function setupMacOSCLI() {
     return;
   }
 
-  const content = String.raw`#!/bin/bash\n\"/Applications/RepoFlow.app/Contents/MacOS/RepoFlow\" \"\$@\" > /dev/null 2>&1 &\ndisown\nexit`;
-  const command = `echo "${content}" > ${target} && chmod +x ${target}`;
+  const content = [
+    '#!/bin/bash',
+    '"/Applications/RepoFlow.app/Contents/MacOS/RepoFlow" "$@" > /dev/null 2>&1 &',
+    'disown',
+    'exit'
+  ].join('\n') + '\n';
 
-  exec(command, (error) => {
-    if (error) {
-      console.error("Failed to create symbolic link for CLI:", error);
-    } else {
-      console.info("Symbolic link for CLI created successfully");
-    }
-  });
+  try {
+    writeFileIfChanged(target, content);
+    chmodSync(target, 0o755);
+    console.info("Symbolic link for CLI created successfully");
+  } catch (error) {
+    console.error("Failed to create symbolic link for CLI:", error);
+  }
 }
 
 function resolveWindowsCliDirectory(): string | undefined {

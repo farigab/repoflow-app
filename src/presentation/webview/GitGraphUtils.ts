@@ -24,18 +24,24 @@ export function buildPrUrl(remoteUrl: string, source: string, target: string, ti
     .replace(/^git@gitlab\.com:/, 'https://gitlab.com/')
     .replace(/^git@bitbucket\.org:/, 'https://bitbucket.org/')
     .replace(/\.git$/, '');
+  let url: URL;
+  try {
+    url = new URL(normalized);
+  } catch {
+    return null;
+  }
 
   const enc = encodeURIComponent;
   const encodedTitle = title ? `&title=${enc(title)}` : '';
   const encodedDescription = description ? `&body=${enc(description)}` : '';
 
-  if (/github\.com/.test(normalized)) {
+  if (url.hostname === 'github.com') {
     const base = `${normalized}/compare/${enc(target)}...${enc(source)}`;
     const params = `?quick_pull=1${encodedTitle}${encodedDescription}`;
     return base + params;
   }
 
-  if (/gitlab\.com/.test(normalized)) {
+  if (url.hostname === 'gitlab.com') {
     const params: string[] = [
       `merge_request[source_branch]=${enc(source)}`,
       `merge_request[target_branch]=${enc(target)}`
@@ -49,7 +55,7 @@ export function buildPrUrl(remoteUrl: string, source: string, target: string, ti
     return `${normalized}/-/merge_requests/new?${params.join('&')}`;
   }
 
-  if (/bitbucket\.org/.test(normalized)) {
+  if (url.hostname === 'bitbucket.org') {
     const params: string[] = [
       `source=${enc(source)}`,
       `dest=${enc(target)}`

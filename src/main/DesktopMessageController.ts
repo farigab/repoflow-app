@@ -573,7 +573,7 @@ export class DesktopMessageController {
 
   private async handlePreviewStash(payload: PayloadFor<'previewStash'>): Promise<void> {
     await this.withBusy('Opening stash preview...', async () => {
-      await this.repository.previewStash(payload.repoRoot, payload.ref);
+      await this.repository.previewStash(payload.repoRoot, payload.ref, payload.paths);
     }).catch(async (error) => {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.appendLine(`[stash-preview] ${message}`);

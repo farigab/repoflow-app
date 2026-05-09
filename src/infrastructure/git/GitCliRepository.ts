@@ -358,19 +358,23 @@ export class GitCliRepository implements GitRepository {
         isRemoteRef = false;
       }
 
+      let creationError: unknown;
       try {
         if (isRemoteRef) {
           await this.runGit(repoRoot, ['checkout', '--track', '-b', name, fromRef]);
         } else {
           await this.runGit(repoRoot, ['checkout', '-b', name, fromRef]);
         }
-      } catch {
+      } catch (error) {
+        creationError = error;
         // If creation fails (e.g. branch already exists) attempt to
         // checkout the existing branch so the user ends up on it.
         try {
           await this.runGit(repoRoot, ['checkout', name]);
-        } catch {
-          // swallow — best-effort
+        } catch (checkoutError) {
+          const creationMessage = creationError instanceof Error ? creationError.message : String(creationError);
+          const checkoutMessage = checkoutError instanceof Error ? checkoutError.message : String(checkoutError);
+          throw new Error(`Failed to create branch '${name}' from '${fromRef}'. ${creationMessage}. Fallback checkout also failed: ${checkoutMessage}`);
         }
       }
     } else {
@@ -677,13 +681,18 @@ export class GitCliRepository implements GitRepository {
     this.graphCache.clear();
   }
 
-  public async previewStash(repoRoot: string, ref: string): Promise<void> {
+  public async previewStash(repoRoot: string, ref: string, paths?: string[]): Promise<void> {
     const files = await this.listStashFiles(repoRoot, ref);
     if (files.length === 0) {
       throw new Error(`No files found in ${ref}.`);
     }
 
-    await this.openStashFileDiff(repoRoot, ref, files[0]);
+    const selectedPaths = this.normalizePathList(paths);
+    const selectedFile = selectedPaths.length > 0
+      ? files.find((file) => selectedPaths.includes(escapePathSpec(file.path)))
+      : undefined;
+
+    await this.openStashFileDiff(repoRoot, ref, selectedFile ?? files[0]);
   }
 
   public async getBlame(repoRoot: string, relativeFilePath: string): Promise<BlameEntry[]> {
