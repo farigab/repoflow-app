@@ -77,7 +77,7 @@ export function RepositoryTabs({
                 role="tab"
                 aria-selected={isActive}
                 className="repo-tab__select"
-                title={entry.repoRoot}
+                aria-label={`${entry.name}: ${metaLabel}`}
                 onClick={() => onSelect(entry.repoRoot)}
               >
                 <span className={statusClassName} />
