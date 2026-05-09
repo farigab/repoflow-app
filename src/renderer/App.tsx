@@ -485,7 +485,6 @@ export function App() {
   if (!activeRepoRoot) {
     content = (
       <RepositorySelectionScreen
-        hero={assets.hero}
         onOpenSingle={handleOpenSingleRepository}
       />
     );

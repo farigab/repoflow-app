@@ -8,9 +8,13 @@
   --success: var(--vscode-gitDecoration-addedResourceForeground, #73c991);
   --warning: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
   --danger: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   --font: var(--vscode-font-family, "Segoe UI", sans-serif);
   --radius: 4px;
+  --scrollbar-track: color-mix(in srgb, var(--bg) 86%, var(--panel-border) 14%);
+  --scrollbar-thumb: color-mix(in srgb, var(--muted) 42%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--muted) 64%, transparent);
+  --scrollbar-thumb-active: color-mix(in srgb, var(--accent) 68%, var(--muted) 32%);
 }
 
 * {
@@ -30,6 +34,48 @@ body,
 
 body {
   min-height: 100vh;
+}
+
+* {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  min-height: 2.5rem;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--scrollbar-thumb-active);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 button,
@@ -104,12 +150,11 @@ select:focus {
 .repo-tabs {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  min-height: 4rem;
-  padding: 0.75rem 1rem 0.65rem;
+  gap: 0.6rem;
+  min-height: 3.1rem;
+  padding: 0.45rem 0.65rem;
   border-bottom: 1px solid var(--panel-border);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel) 88%, #0f172a 12%) 0%, var(--panel) 100%);
+  background: var(--panel);
 }
 
 .repo-tabs__scroller {
@@ -132,8 +177,11 @@ select:focus {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.45rem 0.75rem;
+  min-height: 2.1rem;
+  padding: 0.35rem 0.7rem;
   white-space: nowrap;
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--panel-border) 64%);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .repo-tab {
@@ -142,15 +190,14 @@ select:focus {
   min-width: 0;
   flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--panel-border) 76%, transparent 24%);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--bg) 34%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  background: transparent;
 }
 
 .repo-tab--active {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent 45%);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, var(--panel) 78%) 0%, color-mix(in srgb, var(--panel) 84%, #020617 16%) 100%);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent 76%);
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent 42%);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .repo-tab__select,
@@ -164,8 +211,8 @@ select:focus {
   align-items: center;
   gap: 0.7rem;
   min-width: 0;
-  padding: 0.55rem 0.35rem 0.55rem 0.7rem;
-  border-radius: 11px 0 0 11px;
+  padding: 0.45rem 0.35rem 0.45rem 0.65rem;
+  border-radius: 5px 0 0 5px;
 }
 
 .repo-tab__close {
@@ -176,7 +223,7 @@ select:focus {
   padding: 0;
   color: var(--muted);
   border-left: 1px solid color-mix(in srgb, var(--panel-border) 70%, transparent 30%);
-  border-radius: 0 11px 11px 0;
+  border-radius: 0 5px 5px 0;
 }
 
 .repo-tab__close:hover {
@@ -189,17 +236,14 @@ select:focus {
   border-radius: 999px;
   flex-shrink: 0;
   background: color-mix(in srgb, var(--success) 72%, var(--panel) 28%);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 10%, transparent);
 }
 
 .repo-tab__status--dirty {
   background: color-mix(in srgb, var(--warning) 82%, white 18%);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 12%, transparent);
 }
 
 .repo-tab__status--warning {
   background: color-mix(in srgb, var(--danger) 78%, white 22%);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .repo-tab__text {
@@ -230,57 +274,79 @@ select:focus {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  padding: 2rem;
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 30%),
-    radial-gradient(circle at 85% 100%, color-mix(in srgb, var(--success) 6%, transparent) 0%, transparent 20%),
-    linear-gradient(180deg, color-mix(in srgb, var(--bg) 92%, black 8%) 0%, var(--bg) 100%);
+  padding: 1.6rem;
+  background: var(--bg);
 }
 
 .repo-selector__panel {
-  width: min(48rem, 100%);
-  padding: 1.6rem;
-  border-radius: 24px;
-  border-color: color-mix(in srgb, var(--panel-border) 72%, transparent 28%);
-  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.24);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, white 6%) 0%, color-mix(in srgb, var(--panel) 98%, black 2%) 100%);
-  backdrop-filter: blur(10px);
+  width: min(72rem, 100%);
+  min-height: min(34rem, calc(100vh - 3.2rem));
+  display: flex;
+  align-self: center;
+  padding: 0;
+  border-radius: 8px;
+  border-color: var(--panel-border);
+  background: var(--panel);
+  overflow: hidden;
 }
 
 .repo-selector__content {
   display: grid;
-  gap: 1.4rem;
+  grid-template-columns: minmax(19rem, 0.9fr) minmax(24rem, 1.1fr);
+  width: 100%;
+  min-height: 0;
+}
+
+.repo-selector__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1.75rem;
+  border-right: 1px solid var(--panel-border);
+}
+
+.repo-selector__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: auto;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .repo-selector__intro h1 {
   margin: 0 0 0.55rem;
-  font-size: clamp(2rem, 3.8vw, 2.55rem);
-  line-height: 0.98;
-  letter-spacing: -0.04em;
+  font-size: 2.15rem;
+  line-height: 1.05;
+  letter-spacing: 0;
 }
 
 .repo-selector__intro p {
-  max-width: 33rem;
+  max-width: 31rem;
   margin: 0;
   color: var(--muted);
-  font-size: 0.98rem;
-  line-height: 1.6;
+  font-size: 0.96rem;
+  line-height: 1.55;
 }
 
-.repo-selector__hero {
-  width: 4rem;
-  height: 4rem;
-  margin-bottom: 0.9rem;
-  border-radius: 18px;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+.repo-selector__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .repo-selector__actions {
   display: flex;
-  margin-top: 0.25rem;
+  margin-top: 1.6rem;
 }
 
 .repo-selector__action {
@@ -289,23 +355,21 @@ select:focus {
   gap: 1rem;
   width: 100%;
   min-height: 0;
-  padding: 1rem 1.05rem;
+  padding: 0.95rem 1rem;
   text-align: left;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--bg) 18%, transparent);
+  border-radius: 6px;
+  background: transparent;
   border: 1px solid color-mix(in srgb, var(--panel-border) 76%, transparent 24%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .repo-selector__action--primary {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--panel) 86%) 0%, color-mix(in srgb, var(--panel) 92%, black 8%) 100%);
-  border-color: color-mix(in srgb, var(--accent) 34%, transparent 66%);
+  background: var(--vscode-button-background, var(--accent));
+  border-color: var(--vscode-button-background, var(--accent));
+  color: var(--vscode-button-foreground, #fff);
 }
 
 .repo-selector__action:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.12);
+  background: var(--vscode-button-hoverBackground, color-mix(in srgb, var(--accent) 88%, white 12%));
 }
 
 .repo-selector__action-icon {
@@ -314,11 +378,11 @@ select:focus {
   justify-content: center;
   width: 2.85rem;
   height: 2.85rem;
-  border-radius: 14px;
+  border-radius: 6px;
   flex-shrink: 0;
   font-size: 1rem;
-  background: color-mix(in srgb, var(--bg) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--panel-border) 64%, transparent 36%);
+  background: color-mix(in srgb, var(--vscode-button-foreground, #fff) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-button-foreground, #fff) 28%, transparent);
 }
 
 .repo-selector__action-copy {
@@ -335,7 +399,7 @@ select:focus {
 }
 
 .repo-selector__action-copy span {
-  color: var(--muted);
+  color: color-mix(in srgb, currentColor 74%, transparent);
   line-height: 1.45;
 }
 
@@ -345,17 +409,17 @@ select:focus {
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  color: color-mix(in srgb, var(--text) 78%, var(--muted) 22%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg) 10%, transparent);
+  color: currentColor;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .repo-selector__footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-  margin-top: 1.1rem;
-  padding-top: 1rem;
+  margin-top: auto;
+  padding-top: 1.4rem;
   border-top: 1px solid color-mix(in srgb, var(--panel-border) 68%, transparent 32%);
 }
 
@@ -364,10 +428,139 @@ select:focus {
   align-items: center;
   min-height: 2rem;
   padding: 0.15rem 0.75rem;
-  border-radius: 999px;
+  border-radius: 4px;
   color: var(--muted);
   background: color-mix(in srgb, var(--bg) 18%, transparent);
   border: 1px solid color-mix(in srgb, var(--panel-border) 62%, transparent 38%);
+  font-size: 0.82rem;
+}
+
+.repo-selector__preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--bg) 72%, var(--panel) 28%);
+}
+
+.repo-selector__preview-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.4rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--panel-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--panel);
+}
+
+.repo-selector__preview-toolbar span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.repo-selector__preview-body {
+  position: relative;
+  flex: 1;
+  min-height: 25rem;
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-content: start;
+  border: 1px solid var(--panel-border);
+  border-radius: 0 0 6px 6px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.repo-selector__preview-rail {
+  position: relative;
+  grid-row: 1 / span 4;
+  border-right: 1px solid var(--panel-border);
+}
+
+.repo-selector__preview-line,
+.repo-selector__preview-node {
+  position: absolute;
+  left: 2.65rem;
+}
+
+.repo-selector__preview-line {
+  width: 1px;
+  background: var(--accent);
+}
+
+.repo-selector__preview-line--a {
+  top: 2.4rem;
+  height: 15.6rem;
+}
+
+.repo-selector__preview-line--b {
+  top: 8.4rem;
+  left: 3.45rem;
+  height: 8.4rem;
+  background: var(--warning);
+}
+
+.repo-selector__preview-node {
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-left: -0.3rem;
+  border: 2px solid var(--bg);
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.repo-selector__preview-node--one {
+  top: 2.65rem;
+}
+
+.repo-selector__preview-node--two {
+  top: 7.95rem;
+  background: var(--warning);
+}
+
+.repo-selector__preview-node--three {
+  top: 13.25rem;
+}
+
+.repo-selector__preview-node--four {
+  top: 18.55rem;
+  background: var(--success);
+}
+
+.repo-selector__preview-row {
+  min-width: 0;
+  min-height: 5.35rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.repo-selector__preview-row--active {
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.repo-selector__preview-row span,
+.repo-selector__preview-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-selector__preview-row span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.repo-selector__preview-row small {
+  color: var(--muted);
   font-size: 0.82rem;
 }
 
@@ -598,8 +791,8 @@ select:focus {
   padding: 4px 5px;
   background: var(--vscode-editorWidget-background, var(--panel));
   border: 1px solid var(--vscode-editorWidget-border, var(--panel-border));
-  border-radius: 8px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
   max-width: calc(100% - 16px);
   animation: find-bar-in 140ms cubic-bezier(0.22, 0.8, 0.45, 1);
 }
@@ -1323,6 +1516,19 @@ mark.find-highlight {
     display: flex;
   }
 
+  .repo-selector__content {
+    grid-template-columns: 1fr;
+  }
+
+  .repo-selector__main {
+    border-right: 0;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .repo-selector__preview-body {
+    min-height: 18rem;
+  }
+
   .layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
@@ -1362,8 +1568,21 @@ mark.find-highlight {
   }
 
   .repo-selector__panel {
-    padding: 1.15rem;
-    border-radius: 18px;
+    min-height: 0;
+    border-radius: 8px;
+  }
+
+  .repo-selector__main,
+  .repo-selector__preview {
+    padding: 1rem;
+  }
+
+  .repo-selector__brand {
+    margin-bottom: 2.2rem;
+  }
+
+  .repo-selector__intro h1 {
+    font-size: 1.7rem;
   }
 
   .repo-tabs {
@@ -1394,6 +1613,20 @@ mark.find-highlight {
 
   .repo-selector__footer {
     gap: 0.45rem;
+  }
+
+  .repo-selector__preview-body {
+    grid-template-columns: 4rem minmax(0, 1fr);
+    min-height: 15rem;
+  }
+
+  .repo-selector__preview-line,
+  .repo-selector__preview-node {
+    left: 1.95rem;
+  }
+
+  .repo-selector__preview-line--b {
+    left: 2.65rem;
   }
 
   .details__meta-grid {
@@ -1453,10 +1686,10 @@ mark.find-highlight {
   z-index: 30;
   min-width: 13.5rem;
   padding: 0.35rem;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);
+  border-radius: 6px;
+  background: var(--panel);
   border: 1px solid var(--panel-border);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -1469,7 +1702,7 @@ mark.find-highlight {
   width: 100%;
   padding: 0.55rem 0.65rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   background: transparent;
   color: var(--text);
   font-size: 0.84rem;
@@ -1495,7 +1728,7 @@ mark.find-highlight {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.46);
   z-index: 200;
   display: flex;
   align-items: flex-start;
@@ -1676,7 +1909,7 @@ mark.find-highlight {
   min-height: 2rem;
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--panel-border);
-  border-radius: 999px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--panel) 65%, var(--bg) 35%);
   color: var(--text);
 }
@@ -1694,7 +1927,7 @@ mark.find-highlight {
   padding: 0.85rem 0.95rem;
   border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--panel-border) 80%);
   border-radius: calc(var(--radius) * 1.5);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 86%, var(--bg) 14%) 0%, color-mix(in srgb, var(--panel) 76%, var(--bg) 24%) 100%);
+  background: color-mix(in srgb, var(--panel) 86%, var(--bg) 14%);
 }
 
 .settings-hook-overview__copy {
@@ -1773,7 +2006,7 @@ mark.find-highlight {
   width: 100%;
   padding: 0.55rem 0.7rem;
   border: 1px solid color-mix(in srgb, var(--panel-border) 88%, transparent);
-  border-radius: 10px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--panel) 60%, var(--bg) 40%);
 }
 
@@ -1967,7 +2200,7 @@ mark.find-highlight {
   width: 1.9rem;
   height: 1.9rem;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 4px;
   background: color-mix(in srgb, var(--panel) 62%, var(--bg) 38%);
 }
 
@@ -1984,8 +2217,7 @@ mark.find-highlight {
   padding: 0.95rem 1rem;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--panel-border) 76%);
   border-radius: calc(var(--radius) * 1.5);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--panel) 88%, #0b1220 12%) 0%, color-mix(in srgb, var(--panel) 76%, var(--bg) 24%) 100%);
+  background: color-mix(in srgb, var(--panel) 86%, var(--bg) 14%);
 }
 
 .branches-create-popover__header {
