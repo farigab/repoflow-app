@@ -93,7 +93,7 @@ function CommitHoverTooltip({ data, onEnter, onLeave }: {
     );
 }
 
-const PALETTE = ['#22c55e', '#38bdf8', '#f59e0b', '#fb7185', '#a78bfa', '#14b8a6', '#f97316', '#84cc16'];
+const PALETTE = ['#b185ff', '#7ddfb3', '#f4c56f', '#ff7a9c', '#7bdff2', '#d6bcff', '#f7aef8', '#91f2cf'];
 
 
 
